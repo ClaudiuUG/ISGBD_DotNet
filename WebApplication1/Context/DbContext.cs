@@ -20,6 +20,8 @@ namespace KeyValueDatabaseApi.Context
 
         private static readonly DbContext _dbContext = new DbContext();
 
+        private StorageFactory factory;
+
         public static DbContext GetDbContext()
         {
             return _dbContext;
@@ -28,6 +30,7 @@ namespace KeyValueDatabaseApi.Context
         private DbContext()
         {
             LoadMetadataFile();
+            factory = new StorageFactory();
         }
 
         public IEnumerable<string> Databases { get; }
@@ -68,17 +71,9 @@ namespace KeyValueDatabaseApi.Context
 
         public void InsertRowIntoTable(string tableName, List<string> columnNames, List<string> values)
         {
-            // check that the table has the specified columns - putem sa sarim peste asta momentan
-            // get the type of the columns and check that the given value is of that type - putem sa sarim peste asta
-            // create the object row (dynamic object)
-            // cum nu abvem clase pentru fiecare row, pentru ca o tabela poate sa arate cu vrea userul
-            // trebuie sa putem sa facem obiecte dimanice dupa forma tabelului pentru a le seriaza si stoca
-
-            // Am avut probleme cu path-ul relativ, asa ca am folosit absolut, modifica DatabsePath sa functioneze si la tine
             var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
             if (!Directory.Exists(databaseDirectory))
             {
-                // se face un director cu numele bazei de date - in director o sa avem un fisier pentru fiecare tabel
                 Directory.CreateDirectory(databaseDirectory);
             }
 
@@ -112,14 +107,11 @@ namespace KeyValueDatabaseApi.Context
 
             }
 
-            var factory = new StorageFactory();
             var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
             try
             {
                 storage.OpenOrCreate(databaseDirectory);
                 storage.Set(key, valuesString);
-
-                var pair = storage.Get(key);
             }
             catch (Exception e) { }
             finally
@@ -127,5 +119,42 @@ namespace KeyValueDatabaseApi.Context
                 storage.Dispose();
             }
         }
+
+        public void DeleteRowFromTable(string tableName, string key)
+        {
+            var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
+            var table = GetTableFromCurrentDatabase(tableName);
+
+            if (!Directory.Exists(databaseDirectory))
+            {
+                throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
+            }
+
+
+            if (table == null)
+            {
+                throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
+            }
+
+            string primaryKey = table.PrimaryKey.PrimaryKeyAttribute;
+            if (primaryKey == null)
+            {
+                throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
+            }
+
+            var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            try
+            {
+                storage.OpenOrCreate(databaseDirectory);
+                storage.Remove(key);
+            }
+            catch (Exception e) { }
+            finally
+            {
+                storage.Dispose();
+            }
+
+        }
+
     }
 }
