@@ -1,6 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using DataTanker;
+using DataTanker.Settings;
 using KeyValueDatabaseApi.Exceptions;
 using Newtonsoft.Json;
 
@@ -8,7 +12,7 @@ namespace KeyValueDatabaseApi.Context
 {
     public class DbContext
     {
-        private static readonly string DatabasesPath = $@"{Directory.GetCurrentDirectory()}\DatabaseStorage";
+        private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
 
         private readonly string _metadataFilePath = $@"{DatabasesPath}\Metadata.json";
 
@@ -71,38 +75,33 @@ namespace KeyValueDatabaseApi.Context
             // trebuie sa putem sa facem obiecte dimanice dupa forma tabelului pentru a le seriaza si stoca
 
             // Am avut probleme cu path-ul relativ, asa ca am folosit absolut, modifica DatabsePath sa functioneze si la tine
-            var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName;
+            var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
             if (!Directory.Exists(databaseDirectory))
             {
                 // se face un director cu numele bazei de date - in director o sa avem un fisier pentru fiecare tabel
                 Directory.CreateDirectory(databaseDirectory);
             }
-            var tableFile = databaseDirectory + @"\" + tableName;
-            if (!File.Exists(tableFile)) // might not need this if File.WriteAllText creates the file when one is not already created
-            {
-                File.Create(tableFile);
-            }
-            
-            // if there is a file with the tableName, read it and append the new entry
-            // if there is no file with the tableName, create it and add the new entry
 
             var table = GetTableFromCurrentDatabase(tableName);
 
-            if(table == null) 
+            if (table == null)
             {
                 throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
             }
-            
+
             string primaryKey = table.PrimaryKey.PrimaryKeyAttribute;
-            if(primaryKey == null) 
+            if (primaryKey == null)
             {
                 throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
             }
 
             var key = string.Empty;
             var valuesString = string.Empty;
-            for(var i = 0; i < values.Count; i++){
-                if(string.Equals(columnNames[i], primaryKey))
+
+
+            for (var i = 0; i < values.Count; i++)
+            {
+                if (string.Equals(columnNames[i], primaryKey))
                 {
                     key = values[i];
                 }
@@ -110,13 +109,23 @@ namespace KeyValueDatabaseApi.Context
                 {
                     valuesString += "#" + values[i];
                 }
+
             }
 
-            var row = (key + " " + valuesString);
-            var rows = new [] {row};
-            var fileContent = File.ReadAllLines(tableFile);
+            var factory = new StorageFactory();
+            var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            try
+            {
+                storage.OpenOrCreate(databaseDirectory);
+                storage.Set(key, valuesString);
 
-            File.AppendAllLines(tableFile, rows);
+                var pair = storage.Get(key);
+            }
+            catch (Exception e) { }
+            finally
+            {
+                storage.Dispose();
+            }
         }
     }
 }
