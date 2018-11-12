@@ -24,7 +24,7 @@ namespace KeyValueDatabaseApi.Commands
             var componentMatch = wordFindingRegex.Matches(command);
             var tableName = componentMatch[TableNamePosition].Value;
 
-            var tableColumnsMatch = Regex.Match(command, RegexStrings.TableColumnsWithoutParanthesisRegex);
+            var tableColumnsMatch = Regex.Match(command, RegexStrings.TableColumnsWithoutParenthesesRegex);
             var tableColumnsNameAndType = tableColumnsMatch.Value;
             var identifierRegex = RegexStrings.IdentifierRegex + "|" + RegexStrings.ColumnTypeRegex;
             var tableColumnTypesAndNames = Regex.Match(tableColumnsNameAndType, identifierRegex);

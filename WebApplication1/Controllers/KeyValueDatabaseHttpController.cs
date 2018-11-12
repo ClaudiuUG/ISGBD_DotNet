@@ -10,14 +10,6 @@ namespace KeyValueDatabaseApi.Controllers
 {
     public class KeyValueDatabaseHttpController : ApiController
     {
-        // GET api/<controller>
-        public IEnumerable<string> Get()
-        {
-            return new [] { "value1", "value2" };
-        }
-
-
-        // POST api/<controller>
         [Route("api")]
         public string Post([FromBody]ExecuteCommandRequest commandRequest)
         {
@@ -35,7 +27,6 @@ namespace KeyValueDatabaseApi.Controllers
 
             try
             {
-
                 ICommandParser commandParser = new CommandParser();
                 if (commandParser.TryParse(command, out var parsedCommand))
                 {

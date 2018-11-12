@@ -158,6 +158,7 @@
     <Compile Include="Commands\CreateIndexCommandSpecification.cs" />
     <Compile Include="Commands\CreateTableCommand.cs" />
     <Compile Include="Commands\CreateTableCommandSpecification.cs" />
+    <Compile Include="Commands\DeleteFromCommandSpecification.cs" />
     <Compile Include="Commands\DropDatabaseCommand.cs" />
     <Compile Include="Commands\DropDatabaseCommandSpecification.cs" />
     <Compile Include="Commands\DropTableCommand.cs" />

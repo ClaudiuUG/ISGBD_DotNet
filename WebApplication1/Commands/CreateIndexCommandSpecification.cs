@@ -31,9 +31,9 @@ namespace KeyValueDatabaseApi.Commands
             var indexName = componentMatch[IndexNamePosition].Value;
             var tableName = componentMatch[TableNamePosition].Value;
 
-            var tableColumnsWithParanthesis = Regex.Match(command, RegexStrings.ParameterListRegex).Value;
-            var tableColumnsWithoutParanthesis = Regex.Match(tableColumnsWithParanthesis, RegexStrings.ParameterListWithoutParanthesisRegex).Value;
-            var tableColumns = Regex.Match(tableColumnsWithoutParanthesis, RegexStrings.IdentifierRegex);
+            var tableColumnsWithParentheses = Regex.Match(command, RegexStrings.ParameterListRegex).Value;
+            var tableColumnsWithoutParentheses = Regex.Match(tableColumnsWithParentheses, RegexStrings.ParameterListWithoutParenthesesRegex).Value;
+            var tableColumns = Regex.Match(tableColumnsWithoutParentheses, RegexStrings.IdentifierRegex);
 
             var columnNames = new List<string>();
             while (tableColumns.Success)

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using DataTanker;
 using DataTanker.Settings;
 using KeyValueDatabaseApi.Exceptions;
@@ -12,7 +11,7 @@ namespace KeyValueDatabaseApi.Context
 {
     public class DbContext
     {
-        private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
+        private static readonly string DatabasesPath = $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage\DatabaseStorage";
 
         private readonly string _metadataFilePath = $@"{DatabasesPath}\Metadata.json";
 
@@ -148,7 +147,6 @@ namespace KeyValueDatabaseApi.Context
 
         }
 
-
         public void DeleteRowFromTable(string tableName, string key)
         {
             var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
@@ -158,7 +156,6 @@ namespace KeyValueDatabaseApi.Context
             {
                 throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
             }
-
 
             if (table == null)
             {
@@ -181,14 +178,13 @@ namespace KeyValueDatabaseApi.Context
                 Directory.CreateDirectory(directory);
             }
 
-
             var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
             try
             {
                 storage.OpenOrCreate(directory);
                 storage.Set(key, value);
             }
-            catch (Exception e) { }
+            catch (Exception) { }
             finally
             {
                 storage.Dispose();
@@ -203,7 +199,7 @@ namespace KeyValueDatabaseApi.Context
                 storage.OpenOrCreate(directory);
                 storage.Remove(key);
             }
-            catch (Exception e) { }
+            catch (Exception) { }
             finally
             {
                 storage.Dispose();
