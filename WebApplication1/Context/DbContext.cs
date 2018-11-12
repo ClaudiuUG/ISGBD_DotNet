@@ -72,12 +72,10 @@ namespace KeyValueDatabaseApi.Context
         public void InsertRowIntoTable(string tableName, List<string> columnNames, List<string> values)
         {
             var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
-            if (!Directory.Exists(databaseDirectory))
-            {
-                Directory.CreateDirectory(databaseDirectory);
-            }
-
             var table = GetTableFromCurrentDatabase(tableName);
+            var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            storage.OpenExisting(databaseDirectory);
+
 
             if (table == null)
             {
@@ -104,21 +102,52 @@ namespace KeyValueDatabaseApi.Context
                 {
                     valuesString += "#" + values[i];
                 }
-
             }
 
-            var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
-            try
+            InsertIntoIndexFile(databaseDirectory, key, valuesString);
+
+            key = string.Empty;
+            valuesString = string.Empty;
+            foreach (var indexFile in table.IndexFiles)
             {
-                storage.OpenOrCreate(databaseDirectory);
-                storage.Set(key, valuesString);
+                for (var i = 0; i < values.Count; i++)
+                {
+                    if (indexFile.IndexAttributes.Contains(columnNames[i]))
+                    {
+                        key += "#" + values[i];
+                    }
+                    else
+                    {
+                        valuesString += "#" + values[i];
+                    }
+                }
+
+                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + indexFile.IndexName, key, valuesString);
             }
-            catch (Exception e) { }
-            finally
+
+            key = string.Empty;
+            valuesString = string.Empty;
+            foreach (var entry in table.UniqueKeyEntry)
             {
-                storage.Dispose();
+                for (var i = 0; i < values.Count; i++)
+                {
+                    if (entry.UniqueAttribute.Equals(columnNames[i]))
+                    {                        
+                        key = values[i];
+                    }
+                    else
+                    {
+                        valuesString += "#" + values[i];
+                    }
+                }
+
+                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.UniqueAttribute, key, valuesString);
             }
+
+            storage.Dispose();
+
         }
+
 
         public void DeleteRowFromTable(string tableName, string key)
         {
@@ -142,10 +171,36 @@ namespace KeyValueDatabaseApi.Context
                 throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
             }
 
+            DeleteFromIndexFile(databaseDirectory, key);
+        }
+
+        private void InsertIntoIndexFile(string directory, string key, string value)
+        {
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+
             var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
             try
             {
-                storage.OpenOrCreate(databaseDirectory);
+                storage.OpenOrCreate(directory);
+                storage.Set(key, value);
+            }
+            catch (Exception e) { }
+            finally
+            {
+                storage.Dispose();
+            }
+        }
+
+        private void DeleteFromIndexFile(string directory, string key)
+        {
+            var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            try
+            {
+                storage.OpenOrCreate(directory);
                 storage.Remove(key);
             }
             catch (Exception e) { }
