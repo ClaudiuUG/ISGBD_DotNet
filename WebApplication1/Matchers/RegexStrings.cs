@@ -30,5 +30,11 @@ namespace KeyValueDatabaseApi.Matchers
         public static string EqualOperator = "=";
         public static string EqualOperatorRegex = $@"\s*{EqualOperator}\s*";
         public static string KeyEqualsValueRegex = $@"{KeyReservedWordRegex}=\s*{RowEntryValue}";
+        public static string AlterReservedWordRegex = @"\s*alter\s*";
+        public static string AlterTableReservedWordsRegex = $"{AlterReservedWordRegex}{TableReservedWordRegex}";
+        public static string AddReservedWordRegex = @"\s*add\s*";
+        public static string ForeignReservedWordRegex = @"\s*foreign\s*";
+        public static string AddForeignKeyReservedWordsRegex = $"{AddReservedWordRegex}{ForeignReservedWordRegex}{KeyReservedWordRegex}";
+        public static string ReferencesReservedWordRegex = @"\s*references\s*";
     }
 }

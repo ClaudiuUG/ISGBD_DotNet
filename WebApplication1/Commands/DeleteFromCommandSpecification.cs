@@ -32,8 +32,8 @@ namespace KeyValueDatabaseApi.Commands
             var keyMatch = Regex.Match(equalsValueString, RegexStrings.RowEntryValue);
             var keyString = keyMatch.Value;
 
-            parsedCommand = null; // TODO: create command and assign it here
-            return false;
+            parsedCommand = new DeleteFromCommand(tableName, keyString);
+            return true;
         }
     }
 }

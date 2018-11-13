@@ -19,7 +19,7 @@ namespace KeyValueDatabaseApi.Context
 
         private static readonly DbContext _dbContext = new DbContext();
 
-        private StorageFactory factory;
+        private readonly StorageFactory _factory;
 
         public static DbContext GetDbContext()
         {
@@ -29,10 +29,8 @@ namespace KeyValueDatabaseApi.Context
         private DbContext()
         {
             LoadMetadataFile();
-            factory = new StorageFactory();
+            _factory = new StorageFactory();
         }
-
-        public IEnumerable<string> Databases { get; }
 
         public DatabaseMetadataEntry CurrentDatabase { get; set; }
 
@@ -72,16 +70,15 @@ namespace KeyValueDatabaseApi.Context
         {
             var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
             var table = GetTableFromCurrentDatabase(tableName);
-            var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
             storage.OpenExisting(databaseDirectory);
-
 
             if (table == null)
             {
                 throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
             }
 
-            string primaryKey = table.PrimaryKey.PrimaryKeyAttribute;
+            var primaryKey = table.PrimaryKey.PrimaryKeyAttribute;
             if (primaryKey == null)
             {
                 throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
@@ -162,7 +159,7 @@ namespace KeyValueDatabaseApi.Context
                 throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
             }
 
-            string primaryKey = table.PrimaryKey.PrimaryKeyAttribute;
+            var primaryKey = table.PrimaryKey.PrimaryKeyAttribute;
             if (primaryKey == null)
             {
                 throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
@@ -178,7 +175,7 @@ namespace KeyValueDatabaseApi.Context
                 Directory.CreateDirectory(directory);
             }
 
-            var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
             try
             {
                 storage.OpenOrCreate(directory);
@@ -193,7 +190,7 @@ namespace KeyValueDatabaseApi.Context
 
         private void DeleteFromIndexFile(string directory, string key)
         {
-            var storage = factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
             try
             {
                 storage.OpenOrCreate(directory);

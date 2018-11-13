@@ -152,12 +152,14 @@
     <Compile Include="App_Start\FilterConfig.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="App_Start\WebApiConfig.cs" />
+    <Compile Include="Commands\AddForeignKeyCommandSpecification.cs" />
     <Compile Include="Commands\CreateDatabaseCommand.cs" />
     <Compile Include="Commands\CreateDatabaseCommandSpecification.cs" />
     <Compile Include="Commands\CreateIndexCommand.cs" />
     <Compile Include="Commands\CreateIndexCommandSpecification.cs" />
     <Compile Include="Commands\CreateTableCommand.cs" />
     <Compile Include="Commands\CreateTableCommandSpecification.cs" />
+    <Compile Include="Commands\DeleteFromCommand.cs" />
     <Compile Include="Commands\DeleteFromCommandSpecification.cs" />
     <Compile Include="Commands\DropDatabaseCommand.cs" />
     <Compile Include="Commands\DropDatabaseCommandSpecification.cs" />

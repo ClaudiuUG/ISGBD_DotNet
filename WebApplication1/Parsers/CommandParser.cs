@@ -6,7 +6,7 @@ namespace KeyValueDatabaseApi.Parsers
 {
     public class CommandParser : ICommandParser
     {
-        private IEnumerable<ICommandSpecification> KnownCommands = new List<ICommandSpecification> 
+        private readonly IEnumerable<ICommandSpecification> KnownCommands = new List<ICommandSpecification> 
         {
             new CreateDatabaseCommandSpecification(),
             new DropDatabaseCommandSpecification(),
@@ -15,7 +15,8 @@ namespace KeyValueDatabaseApi.Parsers
             new DropTableCommandSpecification(),
             new CreateIndexCommandSpecification(),
             new InsertIntoCommandSpecification(),
-            new DeleteFromCommandSpecification()
+            new DeleteFromCommandSpecification(),
+            new AddForeignKeyCommandSpecification()
         };
 
         public bool TryParse(string command, out ICommand parsedCommand) 

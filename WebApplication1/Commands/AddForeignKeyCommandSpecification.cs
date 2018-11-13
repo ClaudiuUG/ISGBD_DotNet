@@ -1,27 +1,28 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using KeyValueDatabaseApi.Exceptions;
 using KeyValueDatabaseApi.Matchers;
 
 namespace KeyValueDatabaseApi.Commands
 {
-    public class InsertIntoCommandSpecification : ICommandSpecification
+    public class AddForeignKeyCommandSpecification : ICommandSpecification
     {
         private const int TableNamePosition = 2;
 
-        public string InsertIntoCommandRegex = 
+        private readonly string _addForeignKeyRegex =
             "^" +
-            RegexStrings.InsertIntoReservedWordsRegex +
+            RegexStrings.AlterTableReservedWordsRegex +
+            RegexStrings.IdentifierRegex + // table name
+            RegexStrings.AddForeignKeyReservedWordsRegex +
+            RegexStrings.ParameterListRegex + // column list for the new foreign key
+            RegexStrings.ReferencesReservedWordRegex +
             RegexStrings.IdentifierRegex +
-            RegexStrings.ParameterListRegex +
-            RegexStrings.ValuesReservedKeyword +
             RegexStrings.RowEntryValueListRegex + 
             "$";
 
         public bool TryParse(string command, out ICommand parsedCommand)
         {
-            var match = Regex.Match(command, InsertIntoCommandRegex);
-            if (!match.Success) 
+            var match = Regex.Match(command, _addForeignKeyRegex);
+            if (!match.Success)
             {
                 parsedCommand = null;
                 return false;
@@ -37,18 +38,10 @@ namespace KeyValueDatabaseApi.Commands
             var tableColumns = Regex.Match(tableColumnsWithoutParenthesesValue, RegexStrings.IdentifierRegex);
             var columnNames = BuildListFromMatchValues(tableColumns);
 
-            var rowValuesWithoutParenthesesValue = listWithParenthesesMatch.NextMatch().Value;
-            var valuesWithoutParenthesesValue = Regex.Match(rowValuesWithoutParenthesesValue, RegexStrings.RowEntryValueListWithoutParenthesisRegex).Value;
-            var rowEntryValues = Regex.Match(valuesWithoutParenthesesValue, RegexStrings.RowEntryValue);
-            var values = BuildListFromMatchValues(rowEntryValues);
+            // table name and column names acquired, the referenced table and referenced columns must be parsed now
 
-            if (columnNames.Count != values.Count)
-            {
-                throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
-            }
-
-            parsedCommand = new InsertIntoCommand(tableName, columnNames, values);
-            return true;
+            parsedCommand = null;
+            return false;
         }
 
         public List<string> BuildListFromMatchValues(Match match)
