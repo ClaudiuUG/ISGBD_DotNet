@@ -168,55 +168,64 @@ namespace KeyValueDatabaseApi.Context
             DeleteFromIndexFile(databaseDirectory, key);
         }
 
-        public <List<string> SelectRowFromTable(string tableName, List<string> columnNames, string conditionColumn, string conditionValue)
-        {
-            var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
-            var table = GetTableFromCurrentDatabase(tableName);
-            var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
-            string key = "";
-
-            if (table == null)
-            {
-                throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
-            }
-
-            if(conditionColumn.Equals(table.PrimaryKey.PrimaryKeyAttribute))
-            {
-                storage.OpenExisting(databaseDirectory);
-                key = table.PrimaryKey.PrimaryKeyAttribute;
-            }
-            else 
-            {
-                foreach(var index in table.IndexFiles)
-                {
-                    if(conditionColumn.Equals(index.IndexName))
-                    {
-                        storage.OpenExisting(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + indexFile.IndexName);
-                        key = index.IndexName;
-                        break;
-                    }
-                }
-            }
-
-            List<string> result = new List<string>();
+        //public List<string> SelectRowFromTable(string tableName, List<string> columnNames, string conditionColumn, string conditionValue)
+        //{
+        //    var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
+        //    var table = GetTableFromCurrentDatabase(tableName);
+        //    var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+        //    var key = string.Empty;
             
-            if(!string.IsNullOrEmpty(key))
-            {
-                if(storage.Exists(conditionValues[conditionColumns.IndexOf(key)]))
-                {
-                    string row = storage.Get(conditionValues[conditionColumns.IndexOf(key)]);
-                    string[] values = row.Split('#');
-                    for (int i=0; i<values.Length; i++)
-                    {
-                        if(!string.IsNullOrEmpty(values[i]))
-                            if(columnNames.Contains(table.Structure.ElementAt(i)))
-                                result.Add(values[i]);
-                    }
-                }
-            }
+        //    if (table == null)
+        //    {
+        //        throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
+        //    }
 
-            return result;
-        }
+        //    if(conditionColumn.Equals(table.PrimaryKey.PrimaryKeyAttribute))
+        //    {
+        //        storage.OpenExisting(databaseDirectory);
+        //        key = table.PrimaryKey.PrimaryKeyAttribute;
+        //    }
+        //    else 
+        //    {
+        //        foreach(var index in table.IndexFiles)
+        //        {
+        //            if (!conditionColumn.Equals(index.IndexName))
+        //            {
+        //                continue;
+        //            }
+        //            storage.OpenExisting(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + indexFile.IndexName);
+        //            key = index.IndexName;
+        //            break;
+        //        }
+        //    }
+            
+        //    var result = new List<string>();
+        //    if (string.IsNullOrEmpty(key))
+        //    {
+        //        return result;
+        //    }
+        //    if (!storage.Exists(conditionValues[conditionColumns.IndexOf(key)]))
+        //    {
+        //        return result;
+        //    }
+
+        //    var row = storage.Get(conditionValues[conditionColumns.IndexOf(key)]);
+        //    var values = row.Split('#');
+        //    for (var i=0; i<values.Length; i++)
+        //    {
+        //        if (string.IsNullOrEmpty(values[i]))
+        //        {
+        //            continue;
+        //        }
+        //        if (columnNames.Contains(table.Structure.ElementAt(i)))
+        //        {
+        //            result.Add(values[i]);
+
+        //        }
+        //    }
+
+        //    return result;
+        //}
 
         private void InsertIntoIndexFile(string directory, string key, string value)
         {

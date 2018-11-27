@@ -1,3 +1,5 @@
+using RaptorDB;
+
 namespace KeyValueDatabaseApi.Matchers
 {
     public static class RegexStrings
@@ -23,7 +25,9 @@ namespace KeyValueDatabaseApi.Matchers
         public static string RowEntryValueWithSpaces = $@"\s*{RowEntryValue}\s*";
         public static string RowEntryValueListWithoutParenthesisRegex = $@"{RowEntryValueWithSpaces}(,{RowEntryValueWithSpaces})*";
         public static string RowEntryValueListRegex = $@"\s*\({RowEntryValueListWithoutParenthesisRegex}\)\s*";
-        public static string DeleteFromReservedWordsRegex = @"\s*delete\s*from\s*";
+        public static string FromReservedWordWithoutSpacesRegex = "from";
+        public static string FromReservedWordRegex = $@"\s*{FromReservedWordWithoutSpacesRegex}\s*";
+        public static string DeleteFromReservedWordsRegex = $@"\s*delete{FromReservedWordRegex}\";
         public static string WhereReservedWordRegex = @"\s*where\s*";
         public static string KeyReservedWord = "key";
         public static string KeyReservedWordRegex = $@"\s*{KeyReservedWord}\s*";
@@ -35,6 +39,10 @@ namespace KeyValueDatabaseApi.Matchers
         public static string AddReservedWordRegex = @"\s*add\s*";
         public static string ForeignReservedWordRegex = @"\s*foreign\s*";
         public static string AddForeignKeyReservedWordsRegex = $"{AddReservedWordRegex}{ForeignReservedWordRegex}{KeyReservedWordRegex}";
-        public static string ReferencesReservedWordRegex = @"\s*references\s*";
+        public static string ReferencesWithoutSpacesRegex = "references";
+        public static string ReferencesReservedWordRegex = $@"\s*{ReferencesWithoutSpacesRegex}\s*";
+        public static string SelectReservedWordWithoutSpacesRegex = "select";
+        public static string SelectReservedWordRegex = $@"\s*{SelectReservedWordWithoutSpacesRegex}\s*";
+        public static string SelectSubject = @"\*";
     }
 }
