@@ -1,25 +1,27 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using DataTanker;
 using DataTanker.Settings;
 using KeyValueDatabaseApi.Exceptions;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace KeyValueDatabaseApi.Context
 {
-    public class DbContext
+    public class DbContext : IDisposable
     {
-        private static readonly string DatabasesPath = $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage\DatabaseStorage";
+        private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
 
         private readonly string _metadataFilePath = $@"{DatabasesPath}\Metadata.json";
+
+        private static StorageFactory _factory;
+
+        private IKeyValueStorage<ComparableKeyOf<string>, ValueOf<string>> storage;
 
         public Metadata DatabaseMetadata { get; set; }
 
         private static readonly DbContext _dbContext = new DbContext();
-
-        private readonly StorageFactory _factory;
 
         public static DbContext GetDbContext()
         {
@@ -30,6 +32,7 @@ namespace KeyValueDatabaseApi.Context
         {
             LoadMetadataFile();
             _factory = new StorageFactory();
+            storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
         }
 
         public DatabaseMetadataEntry CurrentDatabase { get; set; }
@@ -52,6 +55,7 @@ namespace KeyValueDatabaseApi.Context
         public void UseDatabase(string databaseName)
         {
             _dbContext.CurrentDatabase = GetDatabase(databaseName);
+            SelectRowFromTable("demotable", new List<string> { "columnone, columntwo" }, "column");
         }
 
         public DatabaseMetadataEntry GetDatabase(string databaseName)
@@ -70,8 +74,8 @@ namespace KeyValueDatabaseApi.Context
         {
             var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
             var table = GetTableFromCurrentDatabase(tableName);
-            var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
-            storage.OpenExisting(databaseDirectory);
+            if(!storage.IsOpen)
+                storage.OpenOrCreate(databaseDirectory);
 
             if (table == null)
             {
@@ -94,10 +98,7 @@ namespace KeyValueDatabaseApi.Context
                 {
                     key = values[i];
                 }
-                else
-                {
                     valuesString += "#" + values[i];
-                }
             }
 
             InsertIntoIndexFile(databaseDirectory, key, valuesString);
@@ -112,10 +113,7 @@ namespace KeyValueDatabaseApi.Context
                     {
                         key += "#" + values[i];
                     }
-                    else
-                    {
-                        valuesString += "#" + values[i];
-                    }
+                    valuesString += "#" + values[i];
                 }
 
                 InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + indexFile.IndexName, key, valuesString);
@@ -128,19 +126,14 @@ namespace KeyValueDatabaseApi.Context
                 for (var i = 0; i < values.Count; i++)
                 {
                     if (entry.UniqueAttribute.Equals(columnNames[i]))
-                    {                        
+                    {
                         key = values[i];
                     }
-                    else
-                    {
                         valuesString += "#" + values[i];
-                    }
                 }
 
                 InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.UniqueAttribute, key, valuesString);
             }
-
-            storage.Dispose();
 
         }
 
@@ -168,64 +161,49 @@ namespace KeyValueDatabaseApi.Context
             DeleteFromIndexFile(databaseDirectory, key);
         }
 
-        //public List<string> SelectRowFromTable(string tableName, List<string> columnNames, string conditionColumn, string conditionValue)
-        //{
-        //    var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
-        //    var table = GetTableFromCurrentDatabase(tableName);
-        //    var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
-        //    var key = string.Empty;
-            
-        //    if (table == null)
-        //    {
-        //        throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
-        //    }
+        public List<string> SelectRowFromTable(string tableName, List<string> columnNames, string conditionValue)
+        {
+            var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
+            var table = GetTableFromCurrentDatabase(tableName);
+            var key = string.Empty;
 
-        //    if(conditionColumn.Equals(table.PrimaryKey.PrimaryKeyAttribute))
-        //    {
-        //        storage.OpenExisting(databaseDirectory);
-        //        key = table.PrimaryKey.PrimaryKeyAttribute;
-        //    }
-        //    else 
-        //    {
-        //        foreach(var index in table.IndexFiles)
-        //        {
-        //            if (!conditionColumn.Equals(index.IndexName))
-        //            {
-        //                continue;
-        //            }
-        //            storage.OpenExisting(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + indexFile.IndexName);
-        //            key = index.IndexName;
-        //            break;
-        //        }
-        //    }
-            
-        //    var result = new List<string>();
-        //    if (string.IsNullOrEmpty(key))
-        //    {
-        //        return result;
-        //    }
-        //    if (!storage.Exists(conditionValues[conditionColumns.IndexOf(key)]))
-        //    {
-        //        return result;
-        //    }
+            if (table == null)
+            {
+                throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
+            }
 
-        //    var row = storage.Get(conditionValues[conditionColumns.IndexOf(key)]);
-        //    var values = row.Split('#');
-        //    for (var i=0; i<values.Length; i++)
-        //    {
-        //        if (string.IsNullOrEmpty(values[i]))
-        //        {
-        //            continue;
-        //        }
-        //        if (columnNames.Contains(table.Structure.ElementAt(i)))
-        //        {
-        //            result.Add(values[i]);
+            if (!storage.IsOpen)
+                storage.OpenOrCreate(databaseDirectory);
 
-        //        }
-        //    }
+            key = "#" + table.PrimaryKey.PrimaryKeyAttribute;
 
-        //    return result;
-        //}
+            var result = new List<string>();
+            if (string.IsNullOrEmpty(key))
+            {
+                return result;
+            }
+            if (!storage.Exists(conditionValue))
+            {
+                return result;
+            }
+
+            string row = storage.Get(conditionValue);
+            var values = row.Split('#');
+            for (var i = 0; i < values.Length; i++)
+            {
+                if (string.IsNullOrEmpty(values[i]))
+                {
+                    continue;
+                }
+                if (columnNames == null || columnNames.Contains(table.Structure.ElementAt(i).AttributeName) || columnNames.Count == 0)
+                {
+                    result.Add(values[i]);
+
+                }
+            }
+
+            return result;
+        }
 
         private void InsertIntoIndexFile(string directory, string key, string value)
         {
@@ -234,34 +212,23 @@ namespace KeyValueDatabaseApi.Context
                 Directory.CreateDirectory(directory);
             }
 
-            var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
-            try
-            {
+            if (!storage.IsOpen)
                 storage.OpenOrCreate(directory);
-                storage.Set(key, value);
-            }
-            catch (Exception) { }
-            finally
-            {
-                storage.Dispose();
-            }
+
+            storage.Set(key, value);
         }
 
         private void DeleteFromIndexFile(string directory, string key)
         {
-            var storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
-            try
-            {
+            if (!storage.IsOpen)
                 storage.OpenOrCreate(directory);
-                storage.Remove(key);
-            }
-            catch (Exception) { }
-            finally
-            {
-                storage.Dispose();
-            }
 
+            storage.Remove(key);
         }
 
+        public void Dispose()
+        {
+            storage.Dispose();
+        }
     }
 }

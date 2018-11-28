@@ -1,4 +1,7 @@
-﻿using System;
+﻿using DataTanker;
+using KeyValueDatabaseApi.Context;
+using KeyValueDatabaseApi.Exceptions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
@@ -33,8 +36,23 @@ namespace KeyValueDatabaseApi.Commands
 
         public void Execute()
         {
-            // update this method if we ever want to support select with projection
-            // throw new NotImplementedException();
+            throw new NotImplementedException();
         }
+
+        public string ExecuteSelect()
+        {
+            var dbContext = DbContext.GetDbContext();
+            if (dbContext.CurrentDatabase == null)
+            {
+                throw new NoDatabaseInUseException();
+            }
+
+            string result = string.Empty;
+            foreach (var s in dbContext.SelectRowFromTable(TableName, ColumnList, KeyToFind))
+                result += s + " ";
+
+            return result;
+        }
+
     }
 }

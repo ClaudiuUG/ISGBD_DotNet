@@ -1,18 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Web.Http;
+﻿using DataTanker;
+using DataTanker.Settings;
+using KeyValueDatabaseApi.Commands;
 using KeyValueDatabaseApi.Exceptions;
 using KeyValueDatabaseApi.Http.Requests;
 using KeyValueDatabaseApi.Parsers;
 using KeyValueDatabaseApi.Validators;
+using System;
+using System.Web.Http;
 
 namespace KeyValueDatabaseApi.Controllers
 {
     public class KeyValueDatabaseHttpController : ApiController
     {
+
         [Route("api")]
         public string Post([FromBody]ExecuteCommandRequest commandRequest)
         {
+
             var command = commandRequest.Command.ToLower();
 
             try
@@ -30,7 +34,15 @@ namespace KeyValueDatabaseApi.Controllers
                 ICommandParser commandParser = new CommandParser();
                 if (commandParser.TryParse(command, out var parsedCommand))
                 {
-                    parsedCommand.Execute();
+                    if (parsedCommand.GetType().Equals(typeof(SelectCommand)))
+                    {
+                        SelectCommand selectCommand = (SelectCommand)parsedCommand;
+                        return selectCommand.ExecuteSelect();
+                    }
+                    else
+                    {
+                        parsedCommand.Execute();
+                    }
                 }
                 else
                 {
