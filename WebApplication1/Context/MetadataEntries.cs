@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using System.Web.UI.WebControls;
 
 namespace KeyValueDatabaseApi.Context
 {
@@ -72,6 +73,8 @@ namespace KeyValueDatabaseApi.Context
         public List<UniqueKeyEntry> UniqueKeyEntry { get; set; }
 
         public List<IndexFileEntry> IndexFiles { get; set; }
+
+        public List<ForeignKeyEntry> ForeignKeys { get; set; }
 
         [OnDeserialized]
         public void OnDeserialized(StreamingContext context)
@@ -152,6 +155,35 @@ namespace KeyValueDatabaseApi.Context
             if (IndexAttributes == null)
             {
                 IndexAttributes = new List<string>();
+            }
+        }
+    }
+
+    [Serializable]
+    public class ForeignKeyEntry
+    {
+        public ForeignKeyEntry(List<string> columns, string referencedTableName, List<string> referencedTableColumns)
+        {
+            
+        }
+
+        public List<string> Columns { get; set; }
+
+        public string ReferencedTableName { get; set; }
+
+        public List<string> ReferencedTableColumns { get; set; }
+
+        [OnSerialized]
+        public void OnDeserialized(StreamingContext context)
+        {
+            if (Columns == null)
+            {
+                Columns = new List<string>();
+            }
+
+            if (ReferencedTableColumns == null)
+            {
+                ReferencedTableColumns = new List<string>();
             }
         }
     }

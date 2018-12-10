@@ -1,3 +1,4 @@
+using System.Web.UI.WebControls;
 using DataTanker;
 using KeyValueDatabaseApi.Context;
 using KeyValueDatabaseApi.Exceptions;
@@ -16,17 +17,7 @@ namespace KeyValueDatabaseApi.Commands
         public void Execute()
         {
             var dbContext = DbContext.GetDbContext();
-             if (dbContext.CurrentDatabase == null)
-            {
-                throw new NoDatabaseInUseException();
-            }
-
-            var tableToRemove = dbContext.GetTableFromCurrentDatabase(TableName);
-            if (tableToRemove != null)
-            {
-                dbContext.CurrentDatabase.Tables.Remove(tableToRemove);
-                dbContext.SaveMetadataToFile();
-            }
+            dbContext.DropTable(TableName);
         }
     }
 }

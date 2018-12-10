@@ -1,4 +1,4 @@
-﻿using DataTanker;
+﻿using KeyValueDatabaseApi.Context;
 using System.Collections.Generic;
 
 namespace KeyValueDatabaseApi.Commands
@@ -20,7 +20,8 @@ namespace KeyValueDatabaseApi.Commands
 
         public void Execute()
         {
-            // throw new System.NotImplementedException();
+            var dbContext = DbContext.GetDbContext();
+            dbContext.AddForeignKey(TableName, TableColumns, ReferencedTableName, ReferencedTableColumns);
         }
     }
 }

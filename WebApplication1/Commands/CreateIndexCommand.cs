@@ -21,19 +21,9 @@ namespace KeyValueDatabaseApi.Commands
 
         public void Execute()
         {
+            
             var dbContext = DbContext.GetDbContext();
-            if (dbContext.CurrentDatabase == null)
-            {
-                throw new NoDatabaseInUseException();
-            }
-
-            var table = dbContext.GetTableFromCurrentDatabase(TableName);
-
-            // TODO: validate that the index name is unique - maybe this should be done by the DbContext
-            // TODO: Validate that the column exist in the table - maybe this should be done by the DbContext
-            // TODO: move all this logic into the dbContext
-            table.IndexFiles.Add(new IndexFileEntry(IndexName, ColumnNames));
-            dbContext.SaveMetadataToFile();
+            dbContext.CreateIndex(IndexName, TableName, ColumnNames);
         }
     }
 }

@@ -12,29 +12,26 @@ namespace KeyValueDatabaseApi.Context
     public class DbContext : IDisposable
     {
         // private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
-        private static readonly string DatabasesPath =
-            $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage";
+        private static readonly string DatabasesPath = $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage";
 
         private readonly string _metadataFilePath = $@"{DatabasesPath}\Metadata.json";
+        private static StorageFactory _storageFactory;
 
-        private static StorageFactory _factory;
-
-        private IKeyValueStorage<ComparableKeyOf<string>, ValueOf<string>> storage;
-
-        public Metadata DatabaseMetadata { get; set; }
-
+        private IKeyValueStorage<ComparableKeyOf<string>, ValueOf<string>> _storage;
         private static readonly DbContext _dbContext = new DbContext();
-
-        public static DbContext GetDbContext()
-        {
-            return _dbContext;
-        }
 
         private DbContext()
         {
             LoadMetadataFile();
-            _factory = new StorageFactory();
-            storage = _factory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            _storageFactory = new StorageFactory();
+            _storage = _storageFactory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+        }
+
+        public Metadata DatabaseMetadata { get; set; }
+
+        public static DbContext GetDbContext()
+        {
+            return _dbContext;
         }
 
         public DatabaseMetadataEntry CurrentDatabase { get; set; }
@@ -57,7 +54,6 @@ namespace KeyValueDatabaseApi.Context
         public void UseDatabase(string databaseName)
         {
             _dbContext.CurrentDatabase = GetDatabase(databaseName);
-            // SelectRowFromTable("demotable", new List<string> { "columnone, columntwo" }, "column");
         }
 
         public DatabaseMetadataEntry GetDatabase(string databaseName)
@@ -66,33 +62,35 @@ namespace KeyValueDatabaseApi.Context
             return matchedDatabase ?? throw new DataBaseDoesNotExistException();
         }
 
-        public TableMetadataEntry GetTableFromCurrentDatabase(string tableName)
-        {
-            var foundTable = CurrentDatabase.Tables.SingleOrDefault(table => table.TableName.Equals(tableName));
-            return foundTable ?? throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, tableName);
-        }
-
         public void InsertRowIntoTable(string tableName, List<string> columnNames, List<string> values)
         {
-            var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
-            var table = GetTableFromCurrentDatabase(tableName);
-            if(!storage.IsOpen)
-                storage.OpenOrCreate(databaseDirectory);
-
-            if (table == null)
+            var tablePath = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
+            var tableMetadata = GetTableFromCurrentDatabase(tableName);
+            if (!_storage.IsOpen)
             {
-                throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
+                _storage.OpenOrCreate(tablePath);
             }
 
-            var primaryKey = table.PrimaryKey.PrimaryKeyAttribute;
+            if (tableMetadata == null)
+            {
+                throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, tableMetadata.TableName);
+            }
+
+            var primaryKey = tableMetadata.PrimaryKey.PrimaryKeyAttribute;
             if (primaryKey == null)
             {
                 throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
             }
 
+            // TODO: check the eventual foreign key constraints
+            // get the foreign keys
+            // check that the value from the referenced table columns exist in the parent table for each foreign key
+            // how ? indexes - each index should have a b+ tree kept consistent upon insertion
+            // beside this, need to update index creation and search using indexes, no other way
+            // if the foreign key constraints are not fulfilled, throw an error with a message
+
             var key = string.Empty;
             var valuesString = string.Empty;
-
 
             for (var i = 0; i < values.Count; i++)
             {
@@ -103,11 +101,11 @@ namespace KeyValueDatabaseApi.Context
                 valuesString += "#" + values[i];
             }
 
-            InsertIntoIndexFile(databaseDirectory, key, valuesString);
+            InsertIntoIndexFile(tablePath, key, valuesString);
 
             key = string.Empty;
             valuesString = string.Empty;
-            foreach (var indexFile in table.IndexFiles)
+            foreach (var indexFile in tableMetadata.IndexFiles)
             {
                 for (var i = 0; i < values.Count; i++)
                 {
@@ -123,7 +121,7 @@ namespace KeyValueDatabaseApi.Context
 
             key = string.Empty;
             valuesString = string.Empty;
-            foreach (var entry in table.UniqueKeyEntry)
+            foreach (var entry in tableMetadata.UniqueKeyEntry)
             {
                 for (var i = 0; i < values.Count; i++)
                 {
@@ -137,6 +135,12 @@ namespace KeyValueDatabaseApi.Context
                 InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.UniqueAttribute, key, valuesString);
             }
 
+        }
+
+        private TableMetadataEntry GetTableFromCurrentDatabase(string tableName)
+        {
+            var foundTable = CurrentDatabase.Tables.SingleOrDefault(table => table.TableName.Equals(tableName));
+            return foundTable ?? throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, tableName);
         }
 
         public void DeleteRowFromTable(string tableName, string key)
@@ -164,7 +168,7 @@ namespace KeyValueDatabaseApi.Context
             DeleteFromIndexFile(databaseDirectory, key);
         }
 
-        public List<string> SelectRowFromTable(string tableName, List<string> columnNames, string conditionValue)
+        public List<string> SelectRowFromTable(string tableName, List<string> columnNames, string searchedKeyValue)
         {
             var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
             var table = GetTableFromCurrentDatabase(tableName);
@@ -175,22 +179,24 @@ namespace KeyValueDatabaseApi.Context
                 throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
             }
 
-            if (!storage.IsOpen)
-                storage.OpenOrCreate(databaseDirectory);
+            if (!_storage.IsOpen)
+            {
+                _storage.OpenOrCreate(databaseDirectory);
+            }
 
-            key = "#" + conditionValue;
+            key = "#" + searchedKeyValue;
 
             var result = new List<string>();
             if (string.IsNullOrEmpty(key))
             {
                 return result;
             }
-            if (!storage.Exists(key))
+            if (!_storage.Exists(key))
             {
                 return result;
             }
 
-            string row = storage.Get(key);
+            var row = _storage.Get(key).Value;
             var values = row.Split('#');
             for (var i = 0; i < values.Length; i++)
             {
@@ -201,7 +207,6 @@ namespace KeyValueDatabaseApi.Context
                 if (columnNames == null || columnNames.Contains(table.Structure.ElementAt(i).AttributeName) || columnNames.Count == 0)
                 {
                     result.Add(values[i]);
-
                 }
             }
 
@@ -215,23 +220,66 @@ namespace KeyValueDatabaseApi.Context
                 Directory.CreateDirectory(directory);
             }
 
-            if (!storage.IsOpen)
-                storage.OpenOrCreate(directory);
+            if (!_storage.IsOpen)
+                _storage.OpenOrCreate(directory);
 
-            storage.Set(key, value);
+            _storage.Set(key, value);
         }
 
         private void DeleteFromIndexFile(string directory, string key)
         {
-            if (!storage.IsOpen)
-                storage.OpenOrCreate(directory);
+            if (!_storage.IsOpen)
+                _storage.OpenOrCreate(directory);
 
-            storage.Remove(key);
+            _storage.Remove(key);
+        }
+
+        public void DropTable(string tableName)
+        {
+            if (CurrentDatabase == null)
+            {
+                throw new NoDatabaseInUseException();
+            }
+
+            var tableToRemove = GetTableFromCurrentDatabase(tableName);
+            if (tableToRemove != null)
+            {
+                CurrentDatabase.Tables.Remove(tableToRemove);
+                SaveMetadataToFile();
+            }
+        }
+
+        internal void CreateIndex(string indexName, string tableName, List<string> columnNames)
+        {
+            if (CurrentDatabase == null)
+            {
+                throw new NoDatabaseInUseException();
+            }
+
+            // TODO: validate that the index name is unique - maybe this should be done by the DbContext
+            // TODO: Validate that the column exist in the table - maybe this should be done by the DbContext
+            // TODO: move all this logic into the dbContext
+            // the index should have a b+ tree asociated
+            var table = GetTableFromCurrentDatabase(tableName);
+            table.IndexFiles.Add(new IndexFileEntry(indexName, columnNames));
+            SaveMetadataToFile();
+        }
+
+        public void AddForeignKey(string tableName, List<string> tableColumns, string referencedTableName, List<string> referencedTableColumns)
+        {
+            if (CurrentDatabase == null)
+            {
+                throw new NoDatabaseInUseException();
+            }
+
+            var table = GetTableFromCurrentDatabase(tableName);
+            table.ForeignKeys.Add(new ForeignKeyEntry(tableColumns, referencedTableName, referencedTableColumns));
+            SaveMetadataToFile();
         }
 
         public void Dispose()
         {
-            storage.Dispose();
+            _storage.Dispose();
         }
     }
 }
