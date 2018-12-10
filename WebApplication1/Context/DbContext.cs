@@ -11,7 +11,9 @@ namespace KeyValueDatabaseApi.Context
 {
     public class DbContext : IDisposable
     {
-        private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
+        // private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
+        private static readonly string DatabasesPath =
+            $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage";
 
         private readonly string _metadataFilePath = $@"{DatabasesPath}\Metadata.json";
 
@@ -55,7 +57,7 @@ namespace KeyValueDatabaseApi.Context
         public void UseDatabase(string databaseName)
         {
             _dbContext.CurrentDatabase = GetDatabase(databaseName);
-            SelectRowFromTable("demotable", new List<string> { "columnone, columntwo" }, "column");
+            // SelectRowFromTable("demotable", new List<string> { "columnone, columntwo" }, "column");
         }
 
         public DatabaseMetadataEntry GetDatabase(string databaseName)
@@ -96,9 +98,9 @@ namespace KeyValueDatabaseApi.Context
             {
                 if (string.Equals(columnNames[i], primaryKey))
                 {
-                    key = values[i];
+                    key += "#" + values[i];
                 }
-                    valuesString += "#" + values[i];
+                valuesString += "#" + values[i];
             }
 
             InsertIntoIndexFile(databaseDirectory, key, valuesString);
@@ -142,6 +144,7 @@ namespace KeyValueDatabaseApi.Context
             var databaseDirectory = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
             var table = GetTableFromCurrentDatabase(tableName);
 
+            key = "#" + key;
             if (!Directory.Exists(databaseDirectory))
             {
                 throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
@@ -175,19 +178,19 @@ namespace KeyValueDatabaseApi.Context
             if (!storage.IsOpen)
                 storage.OpenOrCreate(databaseDirectory);
 
-            key = "#" + table.PrimaryKey.PrimaryKeyAttribute;
+            key = "#" + conditionValue;
 
             var result = new List<string>();
             if (string.IsNullOrEmpty(key))
             {
                 return result;
             }
-            if (!storage.Exists(conditionValue))
+            if (!storage.Exists(key))
             {
                 return result;
             }
 
-            string row = storage.Get(conditionValue);
+            string row = storage.Get(key);
             var values = row.Split('#');
             for (var i = 0; i < values.Length; i++)
             {

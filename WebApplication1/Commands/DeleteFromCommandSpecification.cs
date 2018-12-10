@@ -8,11 +8,13 @@ namespace KeyValueDatabaseApi.Commands
     {
         private const int TableNamePosition = 2;
 
-        public string DeleteFromCommandRegex = "^" +
-                                               RegexStrings.DeleteFromReservedWordsRegex +
-                                               RegexStrings.IdentifierRegex +
-                                               RegexStrings.WhereReservedWordRegex +
-                                               RegexStrings.KeyEqualsValueRegex + "$";
+        public string DeleteFromCommandRegex =
+            @"^\s*delete\s*from\s*[A-Za-z0-9][A-Za-z0-9]*\s*where\s*\s*key\s*=\s*[A-Za-z0-9]+$";
+                                               // "^" +
+                                               //RegexStrings.DeleteFromReservedWordsRegex +
+                                               //RegexStrings.IdentifierRegex +
+                                               //RegexStrings.WhereReservedWordRegex +
+                                               //RegexStrings.KeyEqualsValueRegex + "$";
 
         public bool TryParse(string command, out ICommand parsedCommand)
         {
