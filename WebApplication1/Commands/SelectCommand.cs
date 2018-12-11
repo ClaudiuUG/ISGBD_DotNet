@@ -42,16 +42,7 @@ namespace KeyValueDatabaseApi.Commands
         public string ExecuteSelect()
         {
             var dbContext = DbContext.GetDbContext();
-            if (dbContext.CurrentDatabase == null)
-            {
-                throw new NoDatabaseInUseException();
-            }
-
-            string result = string.Empty;
-            foreach (var s in dbContext.SelectRowFromTable(TableName, ColumnList, KeyToFind))
-                result += s + " ";
-
-            return result;
+            return dbContext.SelectFromTable(TableName, ColumnList, KeyToFind);
         }
 
     }

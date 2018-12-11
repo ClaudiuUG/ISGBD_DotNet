@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
-using System.Web.UI.WebControls;
 
 namespace KeyValueDatabaseApi.Context
 {
@@ -54,16 +53,11 @@ namespace KeyValueDatabaseApi.Context
         public TableMetadataEntry(
             string tableName,
             List<AttributeEntry> structure,
-            PrimaryKeyEntry primaryKey,
-            List<UniqueKeyEntry> uniqueKeys,
-            List<IndexFileEntry> indexFiles,
-            List<ForeignKeyEntry> foreignKeys)
+            PrimaryKeyEntry primaryKey)
         {
             TableName = tableName;
             Structure = structure;
             PrimaryKey = primaryKey;
-            IndexFiles = indexFiles;
-            ForeignKeys = foreignKeys;
         }
 
         public string TableName { get; set; }
@@ -72,11 +66,11 @@ namespace KeyValueDatabaseApi.Context
 
         public PrimaryKeyEntry PrimaryKey { get; set; }
 
-        public List<UniqueKeyEntry> UniqueKeyEntry { get; set; }
+        public List<UniqueKeyEntry> UniqueKeyEntry { get; set; } = new List<UniqueKeyEntry>();
 
-        public List<IndexFileEntry> IndexFiles { get; set; }
+        public List<IndexFileEntry> IndexFiles { get; set; } = new List<IndexFileEntry>();
 
-        public List<ForeignKeyEntry> ForeignKeys { get; set; }
+        public List<ForeignKeyEntry> ForeignKeys { get; set; } = new List<ForeignKeyEntry>();
 
         [OnDeserialized]
         public void OnDeserialized(StreamingContext context)

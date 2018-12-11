@@ -17,12 +17,7 @@ namespace KeyValueDatabaseApi.Commands
         public void Execute()
         {
             var dbContext = DbContext.GetDbContext();
-            var databaseToRemove = dbContext.GetDatabase(DatabaseName);
-            if (databaseToRemove != null)
-            {
-                dbContext.DatabaseMetadata.Databases.Remove(databaseToRemove);
-            }
-            dbContext.SaveMetadataToFile();
+            dbContext.DropDatabase(DatabaseName);
         }
     }
 }

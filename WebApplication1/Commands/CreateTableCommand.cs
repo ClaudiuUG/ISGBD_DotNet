@@ -21,20 +21,7 @@ namespace KeyValueDatabaseApi.Commands
         public void Execute()
         {
             var dbContext = DbContext.GetDbContext();
-            if (dbContext.CurrentDatabase == null)
-            {
-                throw new NoDatabaseInUseException();
-            }
-
-            var mapper = new AttributeModelEntryMapper();
-            var attributeEntries = new List<AttributeEntry>();
-            foreach (var attribute in Attributes)
-            {
-                attributeEntries.Add(mapper.MapToEntry(attribute));
-            }
-
-            dbContext.CurrentDatabase.Tables.Add(new TableMetadataEntry(TableName, attributeEntries, null, null, null, null));
-            dbContext.SaveMetadataToFile();
+            dbContext.CreateTable(TableName, Attributes);
         }
     }
 }

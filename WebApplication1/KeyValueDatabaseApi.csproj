@@ -174,14 +174,21 @@
     <Compile Include="Commands\SelectCommandSpecification.cs" />
     <Compile Include="Commands\UseDatabaseCommand.cs" />
     <Compile Include="Commands\UseDatabaseCommandSpecification.cs" />
+    <Compile Include="Context\DbAgent.cs" />
     <Compile Include="Context\DbContext.cs" />
+    <Compile Include="Context\FileHelper.cs" />
     <Compile Include="Context\MetadataEntries.cs" />
+    <Compile Include="Context\PathHelper.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Controllers\KeyValueDatabaseHttpController.cs" />
+    <Compile Include="Exceptions\CouldNotFindKeyException.cs" />
     <Compile Include="Exceptions\DataBaseDoesNotExistException.cs" />
+    <Compile Include="Exceptions\EntryAlreadyExistsForKeyException.cs" />
     <Compile Include="Exceptions\InsertIntoCommandColumnCountDoesNotMatchValueCount.cs" />
     <Compile Include="Exceptions\InvalidCommandException.cs" />
     <Compile Include="Exceptions\NoDatabaseInUseException.cs" />
+    <Compile Include="Exceptions\NullOrEmptyKeyException.cs" />
+    <Compile Include="Exceptions\TableAlreadyExistsException.cs" />
     <Compile Include="Exceptions\TableDoesNotExistException.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>

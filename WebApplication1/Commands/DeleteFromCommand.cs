@@ -19,13 +19,7 @@ namespace KeyValueDatabaseApi.Commands
         public void Execute()
         {
             var dbContext = DbContext.GetDbContext();
-            if (dbContext.CurrentDatabase == null)
-            {
-                throw new NoDatabaseInUseException();
-            }
-
             dbContext.DeleteRowFromTable(TableName, Key);
-            dbContext.SaveMetadataToFile();
         }
     }
 }

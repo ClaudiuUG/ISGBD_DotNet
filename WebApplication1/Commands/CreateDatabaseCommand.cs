@@ -18,8 +18,7 @@ namespace KeyValueDatabaseApi.Commands
         public void Execute()
         {
             var dbContext = DbContext.GetDbContext();
-            dbContext.DatabaseMetadata.Databases.Add(new DatabaseMetadataEntry(null, DatabaseName));
-            dbContext.SaveMetadataToFile();
+            dbContext.CreateDatabase(DatabaseName);
         }
     }
 }
