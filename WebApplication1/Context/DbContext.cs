@@ -9,7 +9,7 @@ using System.Linq;
 
 namespace KeyValueDatabaseApi.Context
 {
-    public class DbContext : IDisposable
+    public class DbContext
     {
         private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
         //private static readonly string DatabasesPath = $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage";
@@ -17,14 +17,48 @@ namespace KeyValueDatabaseApi.Context
         private readonly string _metadataFilePath = $@"{DatabasesPath}\Metadata.json";
         private static StorageFactory _storageFactory;
 
-        private IKeyValueStorage<ComparableKeyOf<string>, ValueOf<string>> _storage;
+        private Dictionary<string, IKeyValueStorage<ComparableKeyOf<string>, ValueOf<string>>> storages;
         private static readonly DbContext _dbContext = new DbContext();
 
         private DbContext()
         {
             LoadMetadataFile();
             _storageFactory = new StorageFactory();
-            _storage = _storageFactory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            CreateStoragesDictionary();
+        }
+
+        private void CreateStoragesDictionary()
+        {
+            var _storage = _storageFactory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+            foreach (var db in DatabaseMetadata.Databases)
+            {
+                foreach (var table in db.Tables)
+                {
+                    foreach (var index in table.IndexFiles)
+                    {
+                        string name = db.DatabaseName + "_" + table.TableName + "_index_" + index.IndexName;
+                        storages.Add(name, _storage);
+                        _storage = _storageFactory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+                    }
+
+                    foreach (var unique in table.UniqueKeyEntry)
+                    {
+                        string name = db.DatabaseName + "_" + table.TableName + "_unique_" + unique.UniqueAttribute;
+                        storages.Add(name, _storage);
+                        _storage = _storageFactory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+                    }
+
+                    foreach (var foreign in table.ForeignKeys)
+                    {
+                        string name = db.DatabaseName + "_" + table.TableName + "_foreign_" + foreign.Columns.FirstOrDefault();
+                        storages.Add(name, _storage);
+                        _storage = _storageFactory.CreateBPlusTreeStorage<string, string>(BPlusTreeStorageSettings.Default(sizeof(int)));
+                    }
+
+                    string pkName = db.DatabaseName + "_" + table.TableName + "_primary";
+                    storages.Add(pkName, _storage);
+                }
+            }
         }
 
         public Metadata DatabaseMetadata { get; set; }
@@ -69,7 +103,10 @@ namespace KeyValueDatabaseApi.Context
             {
                 Directory.CreateDirectory(tablePath);
             }
+
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
+
+            var _storage = storages[CurrentDatabase.DatabaseName + "_" + tableName + "_primary"];
             if (!_storage.IsOpen)
             {
                 _storage.OpenOrCreate(tablePath);
@@ -105,7 +142,7 @@ namespace KeyValueDatabaseApi.Context
                 valuesString += "#" + values[i];
             }
 
-            InsertIntoIndexFile(tablePath, key, valuesString);
+            InsertIntoIndexFile(tablePath, key, valuesString, CurrentDatabase.DatabaseName + "_" + tableName + "_primary");
 
             key = string.Empty;
             valuesString = string.Empty;
@@ -120,7 +157,7 @@ namespace KeyValueDatabaseApi.Context
                     valuesString += "#" + values[i];
                 }
 
-                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + indexFile.IndexName, key, valuesString);
+                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + indexFile.IndexName, key, valuesString, CurrentDatabase.DatabaseName + "_" + tableName + "_index_" + indexFile.IndexName);
             }
 
             key = string.Empty;
@@ -133,10 +170,10 @@ namespace KeyValueDatabaseApi.Context
                     {
                         key = values[i];
                     }
-                        valuesString += "#" + values[i];
+                    valuesString += "#" + values[i];
                 }
 
-                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.UniqueAttribute, key, valuesString);
+                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.UniqueAttribute, key, valuesString, CurrentDatabase.DatabaseName + "_" + tableName + "_unique_" + entry.UniqueAttribute);
             }
 
             key = string.Empty;
@@ -147,7 +184,7 @@ namespace KeyValueDatabaseApi.Context
                 {
                     if (entry.Columns.FirstOrDefault().Equals(columnNames[i]))
                     {
-                        if(SelectRowFromTable(entry.ReferencedTableName, null, values[i]).Count == 0)
+                        if (SelectRowFromTable(entry.ReferencedTableName, null, values[i]).Count == 0)
                         {
                             throw new Exception("Key does not exist");
                         }
@@ -157,7 +194,7 @@ namespace KeyValueDatabaseApi.Context
                     valuesString += "#" + values[i];
                 }
 
-                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.ReferencedTableName, key, valuesString);
+                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.ReferencedTableName, key, valuesString, CurrentDatabase.DatabaseName + "_" + tableName + "_foreign_" + entry.Columns.FirstOrDefault());
             }
 
         }
@@ -190,7 +227,7 @@ namespace KeyValueDatabaseApi.Context
                 throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
             }
 
-            DeleteFromIndexFile(databaseDirectory, key);
+            DeleteFromIndexFile(databaseDirectory, key, CurrentDatabase.DatabaseName + "_" + tableName + "_primary");
         }
 
         public List<string> SelectRowFromTable(string tableName, List<string> columnNames, string searchedKeyValue)
@@ -204,11 +241,12 @@ namespace KeyValueDatabaseApi.Context
                 throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
             }
 
-            //if (!_storage.IsOpen)
-            //{
-            _storage.Close();
-            _storage.OpenOrCreate(databaseDirectory);
-            //}
+            var _storage = storages[CurrentDatabase.DatabaseName + "_" + tableName + "_primary"];
+
+            if (!_storage.IsOpen)
+            {
+                _storage.OpenOrCreate(databaseDirectory);
+            }
 
             key = "#" + searchedKeyValue;
 
@@ -239,12 +277,14 @@ namespace KeyValueDatabaseApi.Context
             return result;
         }
 
-        private void InsertIntoIndexFile(string directory, string key, string value)
+        private void InsertIntoIndexFile(string directory, string key, string value, string storageName)
         {
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
+
+            var _storage = storages[storageName];
 
             if (!_storage.IsOpen)
                 _storage.OpenOrCreate(directory);
@@ -252,8 +292,11 @@ namespace KeyValueDatabaseApi.Context
             _storage.Set(key, value);
         }
 
-        private void DeleteFromIndexFile(string directory, string key)
+        private void DeleteFromIndexFile(string directory, string key, string storageName)
         {
+            var _storage = storages[storageName];
+
+
             if (!_storage.IsOpen)
                 _storage.OpenOrCreate(directory);
 
@@ -302,11 +345,6 @@ namespace KeyValueDatabaseApi.Context
             ForeignKeyEntry foreignKeyEntry = new ForeignKeyEntry(tableColumns, referencedTableName, referencedTableColumns);
             table.ForeignKeys.Add(foreignKeyEntry);
             SaveMetadataToFile();
-        }
-
-        public void Dispose()
-        {
-            _storage.Dispose();
         }
     }
 }
