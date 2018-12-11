@@ -33,7 +33,7 @@ namespace KeyValueDatabaseApi.Commands
                 attributeEntries.Add(mapper.MapToEntry(attribute));
             }
 
-            dbContext.CurrentDatabase.Tables.Add(new TableMetadataEntry(TableName, attributeEntries, null, null, null));
+            dbContext.CurrentDatabase.Tables.Add(new TableMetadataEntry(TableName, attributeEntries, null, null, null, null));
             dbContext.SaveMetadataToFile();
         }
     }

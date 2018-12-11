@@ -56,12 +56,14 @@ namespace KeyValueDatabaseApi.Context
             List<AttributeEntry> structure,
             PrimaryKeyEntry primaryKey,
             List<UniqueKeyEntry> uniqueKeys,
-            List<IndexFileEntry> indexFiles)
+            List<IndexFileEntry> indexFiles,
+            List<ForeignKeyEntry> foreignKeys)
         {
             TableName = tableName;
             Structure = structure;
             PrimaryKey = primaryKey;
             IndexFiles = indexFiles;
+            ForeignKeys = foreignKeys;
         }
 
         public string TableName { get; set; }
@@ -90,6 +92,10 @@ namespace KeyValueDatabaseApi.Context
             if (IndexFiles == null)
             {
                 IndexFiles = new List<IndexFileEntry>();
+            }
+            if (ForeignKeys == null)
+            {
+                ForeignKeys = new List<ForeignKeyEntry>();
             }
         }
     }
@@ -164,7 +170,9 @@ namespace KeyValueDatabaseApi.Context
     {
         public ForeignKeyEntry(List<string> columns, string referencedTableName, List<string> referencedTableColumns)
         {
-            
+            Columns = columns;
+            ReferencedTableName = referencedTableName;
+            ReferencedTableColumns = referencedTableColumns;
         }
 
         public List<string> Columns { get; set; }
@@ -173,7 +181,7 @@ namespace KeyValueDatabaseApi.Context
 
         public List<string> ReferencedTableColumns { get; set; }
 
-        [OnSerialized]
+        [OnDeserialized]
         public void OnDeserialized(StreamingContext context)
         {
             if (Columns == null)

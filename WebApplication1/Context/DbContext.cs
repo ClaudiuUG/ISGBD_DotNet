@@ -11,8 +11,8 @@ namespace KeyValueDatabaseApi.Context
 {
     public class DbContext : IDisposable
     {
-        // private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
-        private static readonly string DatabasesPath = $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage";
+        private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
+        //private static readonly string DatabasesPath = $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage";
 
         private readonly string _metadataFilePath = $@"{DatabasesPath}\Metadata.json";
         private static StorageFactory _storageFactory;
@@ -65,6 +65,10 @@ namespace KeyValueDatabaseApi.Context
         public void InsertRowIntoTable(string tableName, List<string> columnNames, List<string> values)
         {
             var tablePath = DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\" + tableName;
+            if (!Directory.Exists(tablePath))
+            {
+                Directory.CreateDirectory(tablePath);
+            }
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
             if (!_storage.IsOpen)
             {
@@ -135,6 +139,27 @@ namespace KeyValueDatabaseApi.Context
                 InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.UniqueAttribute, key, valuesString);
             }
 
+            key = string.Empty;
+            valuesString = string.Empty;
+            foreach (var entry in tableMetadata.ForeignKeys)
+            {
+                for (var i = 0; i < values.Count; i++)
+                {
+                    if (entry.Columns.FirstOrDefault().Equals(columnNames[i]))
+                    {
+                        if(SelectRowFromTable(entry.ReferencedTableName, null, values[i]).Count == 0)
+                        {
+                            throw new Exception("Key does not exist");
+                        }
+
+                        key = values[i];
+                    }
+                    valuesString += "#" + values[i];
+                }
+
+                InsertIntoIndexFile(DatabasesPath + @"\" + CurrentDatabase.DatabaseName + @"\index\" + tableName + @"\" + entry.ReferencedTableName, key, valuesString);
+            }
+
         }
 
         private TableMetadataEntry GetTableFromCurrentDatabase(string tableName)
@@ -179,10 +204,11 @@ namespace KeyValueDatabaseApi.Context
                 throw new TableDoesNotExistException(CurrentDatabase.DatabaseName, table.TableName);
             }
 
-            if (!_storage.IsOpen)
-            {
-                _storage.OpenOrCreate(databaseDirectory);
-            }
+            //if (!_storage.IsOpen)
+            //{
+            _storage.Close();
+            _storage.OpenOrCreate(databaseDirectory);
+            //}
 
             key = "#" + searchedKeyValue;
 
@@ -273,7 +299,8 @@ namespace KeyValueDatabaseApi.Context
             }
 
             var table = GetTableFromCurrentDatabase(tableName);
-            table.ForeignKeys.Add(new ForeignKeyEntry(tableColumns, referencedTableName, referencedTableColumns));
+            ForeignKeyEntry foreignKeyEntry = new ForeignKeyEntry(tableColumns, referencedTableName, referencedTableColumns);
+            table.ForeignKeys.Add(foreignKeyEntry);
             SaveMetadataToFile();
         }
 
