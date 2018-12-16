@@ -1,7 +1,4 @@
-﻿using DataTanker;
-using DataTanker.Settings;
-using KeyValueDatabaseApi.Commands;
-using KeyValueDatabaseApi.Exceptions;
+﻿using KeyValueDatabaseApi.Exceptions;
 using KeyValueDatabaseApi.Http.Requests;
 using KeyValueDatabaseApi.Parsers;
 using KeyValueDatabaseApi.Validators;
@@ -32,23 +29,15 @@ namespace KeyValueDatabaseApi.Controllers
             try
             {
                 ICommandParser commandParser = new CommandParser();
+                string result = string.Empty;
                 if (commandParser.TryParse(command, out var parsedCommand))
                 {
-                    if (parsedCommand.GetType().Equals(typeof(SelectCommand)))
-                    {
-                        SelectCommand selectCommand = (SelectCommand)parsedCommand;
-                        return selectCommand.ExecuteSelect();
-                    }
-                    else
-                    {
-                        parsedCommand.Execute();
-                    }
+                    return parsedCommand.Execute();
                 }
                 else
                 {
                     return $"Could not parse command: {command}";
                 }
-                return "SUCCESS";
             }
             catch (Exception exception)
             {

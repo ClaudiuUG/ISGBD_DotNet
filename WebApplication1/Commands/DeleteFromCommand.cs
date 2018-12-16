@@ -1,6 +1,4 @@
-﻿using DataTanker;
-using KeyValueDatabaseApi.Context;
-using KeyValueDatabaseApi.Exceptions;
+﻿using KeyValueDatabaseApi.Context;
 
 namespace KeyValueDatabaseApi.Commands
 {
@@ -16,10 +14,11 @@ namespace KeyValueDatabaseApi.Commands
            
         public string Key { get; }
 
-        public void Execute()
+        public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
             dbContext.DeleteRowFromTable(TableName, Key);
+            return "SUCCESS";
         }
     }
 }

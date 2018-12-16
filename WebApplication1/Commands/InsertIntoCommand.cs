@@ -1,7 +1,5 @@
 using System.Collections.Generic;
-using DataTanker;
 using KeyValueDatabaseApi.Context;
-using KeyValueDatabaseApi.Exceptions;
 
 namespace KeyValueDatabaseApi.Commands
 {
@@ -20,10 +18,11 @@ namespace KeyValueDatabaseApi.Commands
 
         public List<string> Values { get; }
 
-        public void Execute()
+        public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
             dbContext.InsertRowIntoTable(TableName, ColumnNames, Values);
+            return "SUCCESS";
         }
     }
 }

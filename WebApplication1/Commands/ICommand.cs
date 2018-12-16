@@ -5,6 +5,6 @@ namespace KeyValueDatabaseApi.Commands
 {
     public interface ICommand
     {
-        void Execute();
+        string Execute();
     }
 }

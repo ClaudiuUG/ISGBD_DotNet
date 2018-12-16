@@ -18,10 +18,11 @@ namespace KeyValueDatabaseApi.Commands
         public string ReferencedTableName { get; set; }
         public List<string> ReferencedTableColumns { get; set; }
 
-        public void Execute()
+        public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
             dbContext.AddForeignKey(TableName, TableColumns, ReferencedTableName, ReferencedTableColumns);
+            return "SUCCESS";
         }
     }
 }

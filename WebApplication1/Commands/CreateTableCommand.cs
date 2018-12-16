@@ -1,7 +1,5 @@
 using System.Collections.Generic;
-using DataTanker;
 using KeyValueDatabaseApi.Context;
-using KeyValueDatabaseApi.Exceptions;
 using KeyValueDatabaseApi.Models;
 
 namespace KeyValueDatabaseApi.Commands
@@ -18,10 +16,11 @@ namespace KeyValueDatabaseApi.Commands
 
         public List<AttributeModel> Attributes { get; }
 
-        public void Execute()
+        public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
             dbContext.CreateTable(TableName, Attributes);
+            return "SUCCESS";
         }
     }
 }

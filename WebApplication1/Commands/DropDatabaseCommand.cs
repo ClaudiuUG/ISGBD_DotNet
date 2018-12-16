@@ -1,7 +1,4 @@
-using System.Linq;
-using DataTanker;
 using KeyValueDatabaseApi.Context;
-using KeyValueDatabaseApi.Exceptions;
 
 namespace KeyValueDatabaseApi.Commands
 {
@@ -14,10 +11,11 @@ namespace KeyValueDatabaseApi.Commands
             DatabaseName = databaseName;
         }
 
-        public void Execute()
+        public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
             dbContext.DropDatabase(DatabaseName);
+            return "SUCCESS";
         }
     }
 }

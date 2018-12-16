@@ -1,8 +1,4 @@
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using DataTanker;
 using KeyValueDatabaseApi.Context;
-using KeyValueDatabaseApi.Matchers;
 
 namespace KeyValueDatabaseApi.Commands
 {
@@ -15,10 +11,11 @@ namespace KeyValueDatabaseApi.Commands
             DatabaseName = databaseName;
         }
 
-        public void Execute()
+        public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
             dbContext.CreateDatabase(DatabaseName);
+            return "SUCCESS";
         }
     }
 }

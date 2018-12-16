@@ -1,10 +1,5 @@
-﻿using DataTanker;
-using KeyValueDatabaseApi.Context;
-using KeyValueDatabaseApi.Exceptions;
-using System;
+﻿using KeyValueDatabaseApi.Context;
 using System.Collections.Generic;
-using System.Linq;
-using System.Web;
 
 namespace KeyValueDatabaseApi.Commands
 {
@@ -34,16 +29,10 @@ namespace KeyValueDatabaseApi.Commands
         public bool ShouldSelectAll { get; set; }
         public string KeyToFind { get; set; }
 
-        public void Execute()
-        {
-            throw new NotImplementedException();
-        }
-
-        public string ExecuteSelect()
+        public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
             return dbContext.SelectFromTable(TableName, ColumnList, KeyToFind);
         }
-
     }
 }

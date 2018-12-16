@@ -1,8 +1,4 @@
-using System.Collections.Generic;
-using DataTanker;
 using KeyValueDatabaseApi.Context;
-using KeyValueDatabaseApi.Exceptions;
-using KeyValueDatabaseApi.Matchers;
 
 namespace KeyValueDatabaseApi.Commands
 {
@@ -15,10 +11,11 @@ namespace KeyValueDatabaseApi.Commands
             DatabaseName = databaseName;
         }
 
-        public void Execute()
+        public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
             dbContext.UseDatabase(DatabaseName);
+            return "SUCCESS";
         }
     }
 }
