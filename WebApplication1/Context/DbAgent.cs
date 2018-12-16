@@ -3,7 +3,7 @@ using DataTanker.Settings;
 using KeyValueDatabaseApi.Exceptions;
 namespace KeyValueDatabaseApi.Context
 {
-    internal class DbAgent
+    internal class DbAgent : IDbAgent
     {
         private StorageFactory _storageFactory = new StorageFactory();
 

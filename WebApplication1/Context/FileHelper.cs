@@ -12,5 +12,10 @@ namespace KeyValueDatabaseApi.Context
                 Directory.CreateDirectory(directory);
             }
         }
+
+        public static bool CheckFileExists(string fileName)
+        {
+            return File.Exists(fileName);
+        }
     }
 }

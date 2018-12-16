@@ -12,7 +12,7 @@ namespace KeyValueDatabaseApi.Context
     {
         private static readonly DbContext _dbContext = new DbContext();
 
-        private DbAgent _dbAgent = new DbAgent();
+        private IDbAgent _dbAgent = new DbAgent();
         private Metadata _databaseMetadata;
         private DatabaseMetadataEntry _currentDatabase;
 
@@ -175,6 +175,8 @@ namespace KeyValueDatabaseApi.Context
 
             var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
             var keyValueToInsert = CreateKeyValueForData(columnNames, values, primaryKey);
+            ThrowIfForeignKeyConstraintsAreNotMet(tableName);
+
             _dbAgent.InsertIntoStorage(tablePath, keyValueToInsert.Key, keyValueToInsert.Value);
             UpdateIndices(tableMetadata, values, columnNames);
             UpdateUniqueIndices(tableMetadata, values, columnNames);
@@ -198,6 +200,25 @@ namespace KeyValueDatabaseApi.Context
             }
 
             return new KeyValuePair<string, string>(key, valuesString);
+        }
+
+        public void ThrowIfForeignKeyConstraintsAreNotMet(string tableName)
+        {
+            var foreignKeys = GetForeignKeysForTable(tableName);
+            foreach (var foreignKey in foreignKeys)
+            {
+                var tableColumns = foreignKey.Columns;
+                var referencedTable = foreignKey.ReferencedTableName;
+                var referencedColumns = foreignKey.ReferencedTableColumns;
+                // should use or create index on the referenced table to check that there are entries that meet the constratint
+                // first, we should have working indexes
+            }
+        }
+
+        public List<ForeignKeyEntry> GetForeignKeysForTable(string tableName)
+        {
+            var table = GetTableFromCurrentDatabase(tableName);
+            return table.ForeignKeys;
         }
 
         public void UpdateIndices(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
@@ -335,13 +356,47 @@ namespace KeyValueDatabaseApi.Context
         {
             ThrowIfNoDatabaseInUse();
 
-            // TODO: validate that the index name is unique - maybe this should be done by the DbContext
-            // TODO: Validate that the column exist in the table - maybe this should be done by the DbContext
-            // the index should have a b+ tree asociated
-
             var table = GetTableFromCurrentDatabase(tableName);
+            ThrowIfTableDoesNotExist(tableName);
+
+            var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableName, indexName);
+            ThrowIfIndexAlreadyExists(indexPath, tableName);
+
+            ThrowIfIndexingColumnsDoNotExist(table, columnNames);
+            // BUILD INDEX
+            // multiple inserts into storage for index path
+            // key = valoarea coloanelor
+            // valoare = restul campurilor concatenate
+
             table.IndexFiles.Add(new IndexFileEntry(indexName, columnNames));
             SaveMetadataToFile();
+        }
+
+        private void ThrowIfTableDoesNotExist(string tableName)
+        {
+            if (!FileHelper.CheckFileExists(tableName))
+            {
+                throw new TableDoesNotExistException(_currentDatabase.DatabaseName, tableName);
+            }
+        }
+
+        private void ThrowIfIndexAlreadyExists(string indexPath, string tableName)
+        {
+            if (FileHelper.CheckFileExists(indexPath))
+            {
+                throw new IndexAlreadyExistsException(_currentDatabase.DatabaseName, tableName, indexPath);
+            }
+        }
+
+        private void ThrowIfIndexingColumnsDoNotExist(TableMetadataEntry tableMetadata, List<string> indexColumnNames)
+        {
+            foreach (var indexColumnName in indexColumnNames)
+            {
+                if (!tableMetadata.Structure.Any(attributeEntry => attributeEntry.AttributeName.Equals(indexColumnName)))
+                {
+                    throw new IndexingColumnDoesNotExist(_currentDatabase.DatabaseName, tableMetadata.TableName, indexColumnName);
+                }
+            }
         }
 
         public void AddForeignKey(string tableName, List<string> tableColumns, string referencedTableName, List<string> referencedTableColumns)

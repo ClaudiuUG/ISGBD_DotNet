@@ -21,6 +21,7 @@ namespace KeyValueDatabaseApi.Commands
         public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
+            // BUG - NU SUNT PARATE TOATE COLOANELE !
             dbContext.CreateIndex(IndexName, TableName, ColumnNames);
             return "SUCCESS";
         }

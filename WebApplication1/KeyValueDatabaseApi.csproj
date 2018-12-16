@@ -45,6 +45,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="CSharpTest.Net.Collections, Version=14.906.1403.1082, Culture=neutral, PublicKeyToken=06aee00cce822474, processorArchitecture=MSIL">
+      <HintPath>..\packages\CSharpTest.Net.Collections.14.906.1403.1082\lib\net40\CSharpTest.Net.Collections.dll</HintPath>
+    </Reference>
     <Reference Include="DataTanker.Core, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DataTanker.1.1.0-beta\lib\net40\DataTanker.Core.dll</HintPath>
     </Reference>
@@ -174,14 +177,18 @@
     <Compile Include="Commands\UseDatabaseCommand.cs" />
     <Compile Include="Commands\UseDatabaseCommandSpecification.cs" />
     <Compile Include="Context\DbAgent.cs" />
+    <Compile Include="Context\DbAgentBPlus.cs" />
     <Compile Include="Context\DbContext.cs" />
     <Compile Include="Context\FileHelper.cs" />
+    <Compile Include="Context\IDbAgent.cs" />
     <Compile Include="Context\MetadataEntries.cs" />
     <Compile Include="Context\PathHelper.cs" />
     <Compile Include="Controllers\KeyValueDatabaseHttpController.cs" />
     <Compile Include="Exceptions\CouldNotFindKeyException.cs" />
     <Compile Include="Exceptions\DataBaseDoesNotExistException.cs" />
     <Compile Include="Exceptions\EntryAlreadyExistsForKeyException.cs" />
+    <Compile Include="Exceptions\IndexAlreadyExistsException.cs" />
+    <Compile Include="Exceptions\IndexingColumnDoesNotExist.cs" />
     <Compile Include="Exceptions\InsertIntoCommandColumnCountDoesNotMatchValueCount.cs" />
     <Compile Include="Exceptions\InvalidCommandException.cs" />
     <Compile Include="Exceptions\NoDatabaseInUseException.cs" />
