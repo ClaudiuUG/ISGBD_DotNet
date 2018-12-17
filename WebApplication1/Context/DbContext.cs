@@ -293,17 +293,17 @@ namespace KeyValueDatabaseApi.Context
         {
             ThrowIfNoDatabaseInUse();
 
-            var databaseDirectory = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
+            var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
 
             key = "#" + key;
-            ThrowIfDatabaseDirectoryNotFound(databaseDirectory, tableMetadata);
+            ThrowIfDatabaseDirectoryNotFound(tablePath, tableMetadata);
             ThrowIfTableMetadataIsNull(tableMetadata);
 
             var primaryKey = tableMetadata.PrimaryKey.PrimaryKeyAttribute;
             ThrowIfPrimaryKeyIsNull(primaryKey);
 
-            _dbAgent.DeleteFromIndexFile(databaseDirectory, key, _currentDatabase.DatabaseName + "_" + tableName + "_primary");
+            _dbAgent.DeleteFromStorage(tablePath, key);
             SaveMetadataToFile();
         }
 
@@ -363,6 +363,7 @@ namespace KeyValueDatabaseApi.Context
             ThrowIfIndexAlreadyExists(indexPath, tableName);
 
             ThrowIfIndexingColumnsDoNotExist(table, columnNames);
+
             // BUILD INDEX
             // multiple inserts into storage for index path
             // key = valoarea coloanelor

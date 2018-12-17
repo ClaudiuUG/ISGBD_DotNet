@@ -1,33 +1,54 @@
-﻿using CSharpTest.Net.Collections;
-using CSharpTest.Net.Serialization;
+﻿using CSharpTest.Net.Serialization;
 
 namespace KeyValueDatabaseApi.Context
 {
     public class DbAgentBPlus : IDbAgent
     {
-        public void InsertIntoStorage(string tablePath, string key, string value)
+        private BPlusFactory _bPlusFactory = new BPlusFactory();
+
+        public bool InsertIntoStorage(string storagePath, string key, string value)
         {
-            var options = new BPlusTree<string, string>.OptionsV2(PrimitiveSerializer.String, PrimitiveSerializer.String);
-            options.CalcBTreeOrder(16, 24);
-            options.CreateFile = CreatePolicy.Always;
-            options.FileName = tablePath;
-            using (var tree = new BPlusTree<string, string>(options))
+            var stringSerializer = PrimitiveSerializer.String;
+            bool insertSuccessful;
+            using (var tree = _bPlusFactory.CreateStoredBPlusForWrite(storagePath, stringSerializer, stringSerializer))
             {
-                tree.Add(key, value);
+                insertSuccessful = tree.TryAdd(key, value);
             }
 
-            // nothing else to implement in this method, but it's still work in progress
-            throw new System.NotImplementedException();
+            return insertSuccessful;
         }
 
         public string GetFromStorage(string storagePath, string key)
         {
-            throw new System.NotImplementedException();
+            var stringSerializer = PrimitiveSerializer.String;
+            string storedValue = null;
+            using (var tree = _bPlusFactory.CreateStoredBPlusForReadOrDelete(storagePath, stringSerializer, stringSerializer))
+            {
+                tree.TryGetValue(key, out storedValue);
+            }
+
+            return storedValue;
         }
 
-        public void DeleteFromIndexFile(string storagePath, string key, string storageName)
+        public string DeleteFromStorage(string storagePath, string key)
         {
-            throw new System.NotImplementedException();
+            var stringSerializer = PrimitiveSerializer.String;
+            string storedValue = null;
+            using (var tree = _bPlusFactory.CreateStoredBPlusForReadOrDelete(storagePath, stringSerializer, stringSerializer))
+            {
+                tree.TryRemove(key, out storedValue);
+            }
+
+            return storedValue;
+        }
+
+        public void ClearStorage(string storagePath)
+        {
+            var stringSerializer = PrimitiveSerializer.String;
+            using (var tree = _bPlusFactory.CreateStoredBPlusForReadOrDelete(storagePath, stringSerializer, stringSerializer))
+            {
+                tree.Clear();
+            }
         }
     }
 }

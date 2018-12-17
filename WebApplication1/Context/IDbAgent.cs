@@ -1,11 +1,15 @@
-﻿namespace KeyValueDatabaseApi.Context
+﻿using System;
+
+namespace KeyValueDatabaseApi.Context
 {
     interface IDbAgent
     {
-        void InsertIntoStorage(string tablePath, string key, string value);
+        bool InsertIntoStorage(string storagePath, string key, string value);
 
         string GetFromStorage(string storagePath, string key);
 
-        void DeleteFromIndexFile(string storagePath, string key, string storageName);
+        string DeleteFromStorage(string storagePath, string key);
+
+        void ClearStorage(string storagePath);
     }
 }

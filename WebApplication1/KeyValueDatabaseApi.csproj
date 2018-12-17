@@ -176,6 +176,7 @@
     <Compile Include="Commands\SelectCommandSpecification.cs" />
     <Compile Include="Commands\UseDatabaseCommand.cs" />
     <Compile Include="Commands\UseDatabaseCommandSpecification.cs" />
+    <Compile Include="Context\BPlusFactory.cs" />
     <Compile Include="Context\DbAgent.cs" />
     <Compile Include="Context\DbAgentBPlus.cs" />
     <Compile Include="Context\DbContext.cs" />
@@ -208,7 +209,6 @@
     <Compile Include="Validators\ICommandValidator.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="favicon.ico" />
     <Content Include="Global.asax" />
     <Content Include="ApplicationInsights.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

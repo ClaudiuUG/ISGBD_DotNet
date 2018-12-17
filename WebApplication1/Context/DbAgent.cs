@@ -1,23 +1,27 @@
-﻿using DataTanker;
+﻿using System;
+using DataTanker;
 using DataTanker.Settings;
 using KeyValueDatabaseApi.Exceptions;
 namespace KeyValueDatabaseApi.Context
 {
+    [Obsolete("Use DbAgentBPlus")]
     internal class DbAgent : IDbAgent
     {
         private StorageFactory _storageFactory = new StorageFactory();
 
-        public void InsertIntoStorage(string tablePath, string key, string value)
+        public bool InsertIntoStorage(string storagePath, string key, string value)
         {
             using (var storage = GetStorage())
             {
-                storage.OpenOrCreate(tablePath);
+                storage.OpenOrCreate(storagePath);
                 if (storage.Exists(key))
                 {
                     throw new EntryAlreadyExistsForKeyException(key);
                 }
                 storage.Set(key, value);
             }
+
+            return true;
         }
 
         private IKeyValueStorage<ComparableKeyOf<string>, ValueOf<string>> GetStorage()
@@ -45,7 +49,7 @@ namespace KeyValueDatabaseApi.Context
             return result;
         }
 
-        public void DeleteFromIndexFile(string storagePath, string key, string storageName)
+        public string DeleteFromStorage(string storagePath, string key)
         {
             if (string.IsNullOrEmpty(key))
             {
@@ -61,6 +65,13 @@ namespace KeyValueDatabaseApi.Context
                 }
                 storage.Remove(key);
             }
+
+            return string.Empty;
+        }
+
+        public void ClearStorage(string storagePath)
+        {
+            throw new NotImplementedException();
         }
     }
 }
