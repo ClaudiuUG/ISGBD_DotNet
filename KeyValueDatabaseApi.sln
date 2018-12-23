@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.28010.2046
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KeyValueDatabaseApi", "WebApplication1\KeyValueDatabaseApi.csproj", "{65004DAB-68AD-48A7-8C1E-762BF9548FCB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestProject1", "UnitTestProject1\UnitTestProject1.csproj", "{138D508E-3B68-477E-81F4-81603EAC60AB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KeyValueDatabaseApiUnitTests", "UnitTestProject1\KeyValueDatabaseApiUnitTests.csproj", "{138D508E-3B68-477E-81F4-81603EAC60AB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
