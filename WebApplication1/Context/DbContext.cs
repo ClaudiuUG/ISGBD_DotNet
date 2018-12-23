@@ -12,7 +12,7 @@ namespace KeyValueDatabaseApi.Context
     {
         private static readonly DbContext _dbContext = new DbContext();
 
-        private IDbAgent _dbAgent = new DbAgent();
+        private IDbAgent _dbAgent = new DbAgentBPlus();
         private Metadata _databaseMetadata;
         private DatabaseMetadataEntry _currentDatabase;
 
@@ -90,7 +90,6 @@ namespace KeyValueDatabaseApi.Context
 
             var primaryKeyEntry = new PrimaryKeyEntry(attributes.First().AttributeName);
             _currentDatabase.Tables.Add(new TableMetadataEntry(tableName, attributeEntries, primaryKeyEntry));
-            CreateDirectoryForTable(tableName);
             SaveMetadataToFile();
         }
 
@@ -177,6 +176,8 @@ namespace KeyValueDatabaseApi.Context
             var keyValueToInsert = CreateKeyValueForData(columnNames, values, primaryKey);
             ThrowIfForeignKeyConstraintsAreNotMet(tableName);
 
+            ThrowIfKeyAlreadyStored(tablePath, keyValueToInsert.Key);
+
             _dbAgent.InsertIntoStorage(tablePath, keyValueToInsert.Key, keyValueToInsert.Value);
             UpdateIndices(tableMetadata, values, columnNames);
             UpdateUniqueIndices(tableMetadata, values, columnNames);
@@ -219,6 +220,19 @@ namespace KeyValueDatabaseApi.Context
         {
             var table = GetTableFromCurrentDatabase(tableName);
             return table.ForeignKeys;
+        }
+
+        private void  ThrowIfKeyAlreadyStored(string tablePath, string key)
+        {
+            if (KeyAlreadyStored(tablePath, key))
+            {
+                throw new KeyAlreadyStoredException(tablePath, key);
+            }
+        }
+
+        public bool KeyAlreadyStored(string tablePath, string key)
+        {
+            return _dbAgent.GetFromStorage(tablePath, key) != null;
         }
 
         public void UpdateIndices(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
@@ -297,7 +311,6 @@ namespace KeyValueDatabaseApi.Context
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
 
             key = "#" + key;
-            ThrowIfDatabaseDirectoryNotFound(tablePath, tableMetadata);
             ThrowIfTableMetadataIsNull(tableMetadata);
 
             var primaryKey = tableMetadata.PrimaryKey.PrimaryKeyAttribute;
@@ -305,14 +318,6 @@ namespace KeyValueDatabaseApi.Context
 
             _dbAgent.DeleteFromStorage(tablePath, key);
             SaveMetadataToFile();
-        }
-
-        private void ThrowIfDatabaseDirectoryNotFound(string databaseDirectory, TableMetadataEntry tableMetadata)
-        {
-            if (!Directory.Exists(databaseDirectory))
-            {
-                throw new TableDoesNotExistException(_currentDatabase.DatabaseName, tableMetadata.TableName);
-            }
         }
 
         public string SelectFromTable(string tableName, List<string> columnList, string keyToFind)
@@ -330,7 +335,7 @@ namespace KeyValueDatabaseApi.Context
             var key = "#" + searchedKeyValue;
             var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
             var resultRow = _dbAgent.GetFromStorage(tablePath, key);
-            return FormatResultRow(resultRow, columnNames, tableMetadata);
+            return resultRow != null ? FormatResultRow(resultRow, columnNames, tableMetadata) : new List<string>();
         }
 
         private List<string> FormatResultRow(string row, List<string> columnNames, TableMetadataEntry tableMetadata)
@@ -357,7 +362,6 @@ namespace KeyValueDatabaseApi.Context
             ThrowIfNoDatabaseInUse();
 
             var table = GetTableFromCurrentDatabase(tableName);
-            ThrowIfTableDoesNotExist(tableName);
 
             var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableName, indexName);
             ThrowIfIndexAlreadyExists(indexPath, tableName);
@@ -371,14 +375,6 @@ namespace KeyValueDatabaseApi.Context
 
             table.IndexFiles.Add(new IndexFileEntry(indexName, columnNames));
             SaveMetadataToFile();
-        }
-
-        private void ThrowIfTableDoesNotExist(string tableName)
-        {
-            if (!FileHelper.CheckFileExists(tableName))
-            {
-                throw new TableDoesNotExistException(_currentDatabase.DatabaseName, tableName);
-            }
         }
 
         private void ThrowIfIndexAlreadyExists(string indexPath, string tableName)

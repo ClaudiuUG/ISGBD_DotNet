@@ -192,6 +192,7 @@
     <Compile Include="Exceptions\IndexingColumnDoesNotExist.cs" />
     <Compile Include="Exceptions\InsertIntoCommandColumnCountDoesNotMatchValueCount.cs" />
     <Compile Include="Exceptions\InvalidCommandException.cs" />
+    <Compile Include="Exceptions\KeyAlreadyStoredException.cs" />
     <Compile Include="Exceptions\NoDatabaseInUseException.cs" />
     <Compile Include="Exceptions\NullOrEmptyKeyException.cs" />
     <Compile Include="Exceptions\TableAlreadyExistsException.cs" />
