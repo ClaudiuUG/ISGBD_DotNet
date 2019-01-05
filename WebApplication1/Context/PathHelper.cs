@@ -4,8 +4,8 @@ namespace KeyValueDatabaseApi.Context
 {
     internal static class PathHelper
     {
-        // private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
-        public static readonly string DatabasesPath = $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage";
+        private static readonly string DatabasesPath = $@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\DatabaseStorage";
+        //public static readonly string DatabasesPath = $@"C:\Users\Claudiu\source\repos\WebApplication1\WebApplication1\DatabaseStorage";
 
         public static readonly string MetadataFilePath = $@"{DatabasesPath}\Metadata.json";
 

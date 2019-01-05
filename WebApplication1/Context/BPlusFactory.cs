@@ -9,7 +9,7 @@ namespace KeyValueDatabaseApi.Context
         {
             var options = new BPlusTree<T1, T2>.OptionsV2(keySerializer, valueSerializer);
             options.CalcBTreeOrder(8, 64);
-            options.CreateFile = CreatePolicy.Always;
+            options.CreateFile = CreatePolicy.IfNeeded;
             options.FileName = tablePath;
             return new BPlusTree<T1, T2>(options);
         }
@@ -19,7 +19,7 @@ namespace KeyValueDatabaseApi.Context
         {
             var options = new BPlusTree<T1, T2>.OptionsV2(keySerializer, valueSerializer);
             options.CalcBTreeOrder(8, 64);
-            options.CreateFile = CreatePolicy.Never;
+            options.CreateFile = CreatePolicy.IfNeeded;
             options.FileName = tablePath;
             return new BPlusTree<T1, T2>(options);
         }

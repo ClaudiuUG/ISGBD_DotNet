@@ -21,30 +21,16 @@ namespace KeyValueDatabaseApi.Context
             LoadMetadataFile();
         }
 
-        private void LoadMetadataFile()
-        {
-            _databaseMetadata = JsonConvert.DeserializeObject<Metadata>(File.ReadAllText(PathHelper.MetadataFilePath));
-            if (_databaseMetadata == null)
-            {
-                _databaseMetadata = new Metadata(new List<DatabaseMetadataEntry>());
-            }
-        }
-
-        public static DbContext GetDbContext()
-        {
-            return _dbContext;
-        }
-
+        #region Commands
         public void CreateDatabase(string databaseName)
         {
             _databaseMetadata.Databases.Add(new DatabaseMetadataEntry(null, databaseName));
             SaveMetadataToFile();
         }
 
-        public void SaveMetadataToFile()
+        public void UseDatabase(string databaseName)
         {
-            var serializedDatabaseMetadata = JsonConvert.SerializeObject(_databaseMetadata);
-            File.WriteAllText(PathHelper.MetadataFilePath, serializedDatabaseMetadata);
+            _currentDatabase = GetDatabase(databaseName);
         }
 
         public void DropDatabase(string databaseName)
@@ -54,26 +40,6 @@ namespace KeyValueDatabaseApi.Context
             _databaseMetadata.Databases.Remove(databaseToRemove);
 
             SaveMetadataToFile();
-        }
-
-        public DatabaseMetadataEntry GetDatabase(string databaseName)
-        {
-            var matchedDatabase = _databaseMetadata.Databases.SingleOrDefault(database => database.DatabaseName.Equals(databaseName));
-            ThrowIfDatabaseNotFound(matchedDatabase);
-            return matchedDatabase;
-        }
-
-        private void ThrowIfDatabaseNotFound(DatabaseMetadataEntry databaseMetadata)
-        {
-            if (databaseMetadata == null)
-            {
-                throw new DataBaseDoesNotExistException();
-            }
-        }
-
-        public void UseDatabase(string databaseName)
-        {
-            _currentDatabase = GetDatabase(databaseName);
         }
 
         public void CreateTable(string tableName, IList<AttributeModel> attributes)
@@ -93,32 +59,6 @@ namespace KeyValueDatabaseApi.Context
             SaveMetadataToFile();
         }
 
-        private void ThrowIfNoDatabaseInUse()
-        {
-            if (_currentDatabase == null)
-            {
-                throw new NoDatabaseInUseException();
-            }
-        }
-
-        private void ThrowIfTableNameAlreadyInUse(string tableName)
-        {
-            var tableAlreadyExists = _currentDatabase.Tables.Any(table => table.TableName.Equals(tableName));
-            if (tableAlreadyExists)
-            {
-                throw new TableAlreadyExistsException(tableName);
-            }
-        }
-
-        private void CreateDirectoryForTable(string tableName)
-        {
-            var directory = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-        }
-
         public void DropTable(string tableName)
         {
             ThrowIfNoDatabaseInUse();
@@ -128,30 +68,6 @@ namespace KeyValueDatabaseApi.Context
             {
                 _currentDatabase.Tables.Remove(tableToRemove);
                 SaveMetadataToFile();
-            }
-        }
-
-        private TableMetadataEntry GetTableFromCurrentDatabase(string tableName)
-        {
-            var tableMetadata = _currentDatabase.Tables.SingleOrDefault(table => table.TableName.Equals(tableName));
-            ThrowIfTableMetadataIsNull(tableMetadata);
-
-            return tableMetadata;
-        }
-
-        private void ThrowIfTableMetadataIsNull(TableMetadataEntry tableMetadata)
-        {
-            if (tableMetadata == null)
-            {
-                throw new TableDoesNotExistException(_currentDatabase.DatabaseName, tableMetadata.TableName);
-            }
-        }
-
-        private void ThrowIfPrimaryKeyIsNull(string primaryKey)
-        {
-            if (primaryKey == null)
-            {
-                throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
             }
         }
 
@@ -174,8 +90,9 @@ namespace KeyValueDatabaseApi.Context
 
             var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
             var keyValueToInsert = CreateKeyValueForData(columnNames, values, primaryKey);
-            ThrowIfForeignKeyConstraintsAreNotMet(tableName);
 
+            ThrowIfForeignKeyConstraintsAreNotMet(tableName);
+            ThrowIfUniqueConstraintsAreNotMet(tableMetadata, values, columnNames);
             ThrowIfKeyAlreadyStored(tablePath, keyValueToInsert.Key);
 
             _dbAgent.InsertIntoStorage(tablePath, keyValueToInsert.Key, keyValueToInsert.Value);
@@ -184,6 +101,129 @@ namespace KeyValueDatabaseApi.Context
             UpdateForeignKeys(tableMetadata, values, columnNames);
 
             SaveMetadataToFile();
+        }
+
+        public void DeleteRowFromTable(string tableName, string key)
+        {
+            ThrowIfNoDatabaseInUse();
+
+            var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
+            var tableMetadata = GetTableFromCurrentDatabase(tableName);
+
+            key = "#" + key;
+            ThrowIfTableMetadataIsNull(tableMetadata);
+
+
+            var primaryKey = tableMetadata.PrimaryKey.PrimaryKeyAttribute;
+            ThrowIfPrimaryKeyIsNull(primaryKey);
+
+
+            CheckForeignKeyContraints(tableName, key);
+
+            DeleteRowFromIndices(tableName, key);
+            _dbAgent.DeleteFromStorage(tablePath, key);
+
+            SaveMetadataToFile();
+        }
+
+        public string SelectFromTable(string tableName, List<string> columnList, string keyToFind)
+        {
+            ThrowIfNoDatabaseInUse();
+            var resultTableRows = SelectRowFromTable(tableName, columnList, keyToFind);
+            return string.Join(" ", resultTableRows);
+        }
+
+        public void CreateIndex(string indexName, string tableName, List<string> columnNames)
+        {
+            ThrowIfNoDatabaseInUse();
+
+            var table = GetTableFromCurrentDatabase(tableName);
+
+            var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableName, indexName);
+            ThrowIfIndexAlreadyExists(indexPath, tableName);
+
+            ThrowIfIndexingColumnsDoNotExist(table, columnNames);
+
+            // BUILD INDEX
+            // multiple inserts into storage for index path
+            // key = valoarea coloanelor
+            // valoare = restul campurilor concatenate
+
+            table.IndexFiles.Add(new IndexFileEntry(indexName, columnNames));
+            SaveMetadataToFile();
+        }
+
+        public void AddForeignKey(string tableName, List<string> tableColumns, string referencedTableName, List<string> referencedTableColumns)
+        {
+            ThrowIfNoDatabaseInUse();
+
+            var table = GetTableFromCurrentDatabase(tableName);
+            ForeignKeyEntry foreignKeyEntry = new ForeignKeyEntry(tableColumns, referencedTableName, referencedTableColumns);
+            table.ForeignKeys.Add(foreignKeyEntry);
+            SaveMetadataToFile();
+        }
+        #endregion
+
+        #region Helpers
+        private void LoadMetadataFile()
+        {
+            _databaseMetadata = JsonConvert.DeserializeObject<Metadata>(File.ReadAllText(PathHelper.MetadataFilePath));
+            if (_databaseMetadata == null)
+            {
+                _databaseMetadata = new Metadata(new List<DatabaseMetadataEntry>());
+            }
+        }
+
+        public static DbContext GetDbContext()
+        {
+            return _dbContext;
+        }
+
+        private void SaveMetadataToFile()
+        {
+            var serializedDatabaseMetadata = JsonConvert.SerializeObject(_databaseMetadata);
+            File.WriteAllText(PathHelper.MetadataFilePath, serializedDatabaseMetadata);
+        }
+
+        private DatabaseMetadataEntry GetDatabase(string databaseName)
+        {
+            var matchedDatabase = _databaseMetadata.Databases.SingleOrDefault(database => database.DatabaseName.Equals(databaseName));
+            ThrowIfDatabaseNotFound(matchedDatabase);
+            return matchedDatabase;
+        }
+
+        private void CreateDirectoryForTable(string tableName)
+        {
+            var directory = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+        }
+
+        private TableMetadataEntry GetTableFromCurrentDatabase(string tableName)
+        {
+            var tableMetadata = _currentDatabase.Tables.SingleOrDefault(table => table.TableName.Equals(tableName));
+            ThrowIfTableMetadataIsNull(tableMetadata);
+
+            return tableMetadata;
+        }
+
+        private KeyValuePair<string, string> CreateKeyValueForData(List<string> columnNames, List<string> values, List<string> primaryKey)
+        {
+            var key = string.Empty;
+            var valuesString = string.Empty;
+
+            for (var i = 0; i < values.Count; i++)
+            {
+                if (primaryKey.Contains(columnNames[i]))
+                {
+                    key += "#" + values[i];
+                }
+                valuesString += "#" + values[i];
+            }
+
+            return new KeyValuePair<string, string>(key, valuesString);
         }
 
         private KeyValuePair<string, string> CreateKeyValueForData(List<string> columnNames, List<string> values, string primaryKey)
@@ -203,79 +243,38 @@ namespace KeyValueDatabaseApi.Context
             return new KeyValuePair<string, string>(key, valuesString);
         }
 
-        public void ThrowIfForeignKeyConstraintsAreNotMet(string tableName)
-        {
-            var foreignKeys = GetForeignKeysForTable(tableName);
-            foreach (var foreignKey in foreignKeys)
-            {
-                var tableColumns = foreignKey.Columns;
-                var referencedTable = foreignKey.ReferencedTableName;
-                var referencedColumns = foreignKey.ReferencedTableColumns;
-                // should use or create index on the referenced table to check that there are entries that meet the constratint
-                // first, we should have working indexes
-            }
-        }
-
-        public List<ForeignKeyEntry> GetForeignKeysForTable(string tableName)
+        private List<ForeignKeyEntry> GetForeignKeysForTable(string tableName)
         {
             var table = GetTableFromCurrentDatabase(tableName);
             return table.ForeignKeys;
         }
 
-        private void  ThrowIfKeyAlreadyStored(string tablePath, string key)
-        {
-            if (KeyAlreadyStored(tablePath, key))
-            {
-                throw new KeyAlreadyStoredException(tablePath, key);
-            }
-        }
-
-        public bool KeyAlreadyStored(string tablePath, string key)
+        private bool KeyAlreadyStored(string tablePath, string key)
         {
             return _dbAgent.GetFromStorage(tablePath, key) != null;
         }
 
-        public void UpdateIndices(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
+        private void UpdateIndices(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
         {
-            var key = string.Empty;
-            var valuesString = string.Empty;
-            foreach (var indexFile in tableMetadata.IndexFiles)
+            foreach (var index in tableMetadata.IndexFiles)
             {
-                for (var i = 0; i < values.Count; i++)
-                {
-                    if (indexFile.IndexAttributes.Contains(columnNames[i]))
-                    {
-                        key += "#" + values[i];
-                    }
-                    valuesString += "#" + values[i];
-                }
-
-                var indexStoragePath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableMetadata.TableName, indexFile.IndexName);
-                _dbAgent.InsertIntoStorage(indexStoragePath, key, valuesString);
+                var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableMetadata.TableName, index.IndexName);
+                var keyValueToInsert = CreateKeyValueForData(columnNames, values, index.IndexAttributes);
+                _dbAgent.InsertIntoStorage(indexPath, keyValueToInsert.Key, keyValueToInsert.Value);
             }
         }
 
-        public void UpdateUniqueIndices(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
+        private void UpdateUniqueIndices(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
         {
-            var key = string.Empty;
-            var valuesString = string.Empty;
-            foreach (var entry in tableMetadata.UniqueKeyEntry)
+            foreach (var uniqueKey in tableMetadata.UniqueKeyEntry)
             {
-                for (var i = 0; i < values.Count; i++)
-                {
-                    if (entry.UniqueAttribute.Equals(columnNames[i]))
-                    {
-                        key = values[i];
-                    }
-                    valuesString += "#" + values[i];
-                }
-
-                var indexStoragePath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableMetadata.TableName, entry.UniqueAttribute);
-                _dbAgent.InsertIntoStorage(indexStoragePath, key, valuesString);
+                var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableMetadata.TableName, uniqueKey.UniqueAttribute);
+                var keyValueToInsert = CreateKeyValueForData(columnNames, values, uniqueKey.UniqueAttribute);
+                _dbAgent.InsertIntoStorage(indexPath, keyValueToInsert.Key, keyValueToInsert.Value);
             }
         }
 
-        public void UpdateForeignKeys(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
+        private void UpdateForeignKeys(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
         {
             // Don't quite get this one.
             var key = string.Empty;
@@ -293,7 +292,7 @@ namespace KeyValueDatabaseApi.Context
                             throw new Exception("Key does not exist");
                         }
 
-                        key = values[i];
+                        key = "#" + values[i];
                     }
                     valuesString += "#" + values[i];
                 }
@@ -303,28 +302,52 @@ namespace KeyValueDatabaseApi.Context
             }
         }
 
-        public void DeleteRowFromTable(string tableName, string key)
+        private void CheckForeignKeyContraints(string tableName, string key)
         {
-            ThrowIfNoDatabaseInUse();
+            foreach (var table in _currentDatabase.Tables)
+            {
+                ThrowIfKeyIsForeignKeyToAnotherTable(table.TableName, tableName, key);
+            }
+        }
 
+        private void DeleteRowFromIndices(string tableName, string primaryKey)
+        {
             var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
 
-            key = "#" + key;
-            ThrowIfTableMetadataIsNull(tableMetadata);
+            var row = _dbAgent.GetFromStorage(tablePath, primaryKey);
+            var values = row.Split('#');
 
-            var primaryKey = tableMetadata.PrimaryKey.PrimaryKeyAttribute;
-            ThrowIfPrimaryKeyIsNull(primaryKey);
+            foreach (var index in tableMetadata.IndexFiles)
+            {
+                var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableName, index.IndexName);
+                string key = string.Empty;
+                for (int i = 1; i < values.Length; i++)
+                {
+                    if (index.IndexAttributes.Contains(tableMetadata.Structure[i - 1].AttributeName))
+                    {
+                        key += "#" + values[i];
+                    }
+                }
 
-            _dbAgent.DeleteFromStorage(tablePath, key);
-            SaveMetadataToFile();
-        }
+                _dbAgent.DeleteFromStorage(indexPath, key);
+            }
 
-        public string SelectFromTable(string tableName, List<string> columnList, string keyToFind)
-        {
-            ThrowIfNoDatabaseInUse();
-            var resultTableRows = SelectRowFromTable(tableName, columnList, keyToFind);
-            return string.Join(" ", resultTableRows);
+            foreach (var uniqueKey in tableMetadata.UniqueKeyEntry)
+            {
+                var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableName, uniqueKey.UniqueAttribute);
+                string key = string.Empty;
+                for (int i = 1; i < values.Length; i++)
+                {
+                    if (uniqueKey.UniqueAttribute.Equals(tableMetadata.Structure[i - 1].AttributeName))
+                    {
+                        key += "#" + values[i];
+                    }
+                }
+
+                _dbAgent.DeleteFromStorage(indexPath, key);
+            }
+
         }
 
         private List<string> SelectRowFromTable(string tableName, List<string> columnNames, string searchedKeyValue)
@@ -356,27 +379,9 @@ namespace KeyValueDatabaseApi.Context
 
             return result;
         }
+        #endregion
 
-        public void CreateIndex(string indexName, string tableName, List<string> columnNames)
-        {
-            ThrowIfNoDatabaseInUse();
-
-            var table = GetTableFromCurrentDatabase(tableName);
-
-            var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableName, indexName);
-            ThrowIfIndexAlreadyExists(indexPath, tableName);
-
-            ThrowIfIndexingColumnsDoNotExist(table, columnNames);
-
-            // BUILD INDEX
-            // multiple inserts into storage for index path
-            // key = valoarea coloanelor
-            // valoare = restul campurilor concatenate
-
-            table.IndexFiles.Add(new IndexFileEntry(indexName, columnNames));
-            SaveMetadataToFile();
-        }
-
+        #region Throw
         private void ThrowIfIndexAlreadyExists(string indexPath, string tableName)
         {
             if (FileHelper.CheckFileExists(indexPath))
@@ -396,14 +401,101 @@ namespace KeyValueDatabaseApi.Context
             }
         }
 
-        public void AddForeignKey(string tableName, List<string> tableColumns, string referencedTableName, List<string> referencedTableColumns)
+        private void ThrowIfIndexConstraintsAreNotMet(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
         {
-            ThrowIfNoDatabaseInUse();
-
-            var table = GetTableFromCurrentDatabase(tableName);
-            ForeignKeyEntry foreignKeyEntry = new ForeignKeyEntry(tableColumns, referencedTableName, referencedTableColumns);
-            table.ForeignKeys.Add(foreignKeyEntry);
-            SaveMetadataToFile();
+            foreach (var index in tableMetadata.IndexFiles)
+            {
+                var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableMetadata.TableName, index.IndexName);
+                var keyValueToInsert = CreateKeyValueForData(columnNames, values, index.IndexAttributes);
+                ThrowIfKeyAlreadyStored(indexPath, keyValueToInsert.Key);
+            }
         }
+
+        private void ThrowIfUniqueConstraintsAreNotMet(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
+        {
+            foreach (var uniqueKey in tableMetadata.UniqueKeyEntry)
+            {
+                var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableMetadata.TableName, uniqueKey.UniqueAttribute);
+                var keyValueToInsert = CreateKeyValueForData(columnNames, values, uniqueKey.UniqueAttribute);
+                ThrowIfKeyAlreadyStored(indexPath, keyValueToInsert.Key);
+            }
+        }
+
+        private void ThrowIfKeyIsForeignKeyToAnotherTable(string tableName, string referencedTable, string key)
+        {
+            var indexPath = PathHelper.GetReferencedTablePath(_currentDatabase.DatabaseName, tableName, referencedTable);
+            if (KeyAlreadyStored(indexPath, key))
+            {
+                throw new KeyCouldNotBeDeletedException(indexPath, key);
+            }
+        }
+
+        private void ThrowIfForeignKeyConstraintsAreNotMet(string tableName)
+        {
+            var foreignKeys = GetForeignKeysForTable(tableName);
+            foreach (var foreignKey in foreignKeys)
+            {
+                var tableColumns = foreignKey.Columns;
+                var referencedTable = foreignKey.ReferencedTableName;
+                var referencedColumns = foreignKey.ReferencedTableColumns;
+                // should use or create index on the referenced table to check that there are entries that meet the constratint
+                // first, we should have working indexes
+            }
+        }
+
+        private void ThrowIfKeyAlreadyStored(string tablePath, string key)
+        {
+            if (KeyAlreadyStored(tablePath, key))
+            {
+                throw new KeyAlreadyStoredException(tablePath, key);
+            }
+        }
+
+        private void ThrowIfPrimaryKeyIsNull(string primaryKey)
+        {
+            if (primaryKey == null)
+            {
+                throw new InsertIntoCommandColumnCountDoesNotMatchValueCount();
+            }
+        }
+
+        private void ThrowIfTableMetadataIsNull(TableMetadataEntry tableMetadata)
+        {
+            if (tableMetadata == null)
+            {
+                throw new TableDoesNotExistException(_currentDatabase.DatabaseName, tableMetadata.TableName);
+            }
+        }
+
+        private void ThrowIfNoDatabaseInUse()
+        {
+            if (_currentDatabase == null)
+            {
+                throw new NoDatabaseInUseException();
+            }
+        }
+
+        private void ThrowIfTableNameAlreadyInUse(string tableName)
+        {
+            //When creating a table right after the database, _currentDatabase.Tables is null, resulting in an exception
+            if (_currentDatabase.Tables != null)
+            {
+                var tableAlreadyExists = _currentDatabase.Tables.Any(table => table.TableName.Equals(tableName));
+                if (tableAlreadyExists)
+                {
+                    throw new TableAlreadyExistsException(tableName);
+                }
+            }
+        }
+
+        private void ThrowIfDatabaseNotFound(DatabaseMetadataEntry databaseMetadata)
+        {
+            if (databaseMetadata == null)
+            {
+                throw new DataBaseDoesNotExistException();
+            }
+        }
+
+        #endregion
     }
 }

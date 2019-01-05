@@ -185,6 +185,7 @@
     <Compile Include="Context\MetadataEntries.cs" />
     <Compile Include="Context\PathHelper.cs" />
     <Compile Include="Controllers\KeyValueDatabaseHttpController.cs" />
+    <Compile Include="Exceptions\KeyCouldNotBeDeletedException.cs" />
     <Compile Include="Exceptions\CouldNotFindKeyException.cs" />
     <Compile Include="Exceptions\DataBaseDoesNotExistException.cs" />
     <Compile Include="Exceptions\EntryAlreadyExistsForKeyException.cs" />
