@@ -28,6 +28,7 @@ namespace KeyValueDatabaseApi.Matchers
         public static string FromReservedWordWithoutSpacesRegex = "from";
         public static string FromReservedWordRegex = $@"\s*{FromReservedWordWithoutSpacesRegex}\s*";
         public static string DeleteFromReservedWordsRegex = $@"\s*delete{FromReservedWordRegex}\";
+        public static string WhereReservedWordWithoutSpacesRegex = "where";
         public static string WhereReservedWordRegex = @"\s*where\s*";
         public static string KeyReservedWord = "key";
         public static string KeyReservedWordRegex = $@"\s*{KeyReservedWord}\s*";

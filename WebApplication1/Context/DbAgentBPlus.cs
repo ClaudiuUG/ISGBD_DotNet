@@ -1,4 +1,6 @@
 ﻿using CSharpTest.Net.Serialization;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace KeyValueDatabaseApi.Context
 {
@@ -49,6 +51,18 @@ namespace KeyValueDatabaseApi.Context
             {
                 tree.Clear();
             }
+        }
+
+        public List<KeyValuePair<string, string>> GetAllFromStorage(string storagePath)
+        {
+            var stringSerializer = PrimitiveSerializer.String;
+            List<KeyValuePair<string, string>> values = null;
+            using (var tree = _bPlusFactory.CreateStoredBPlusForReadOrDelete(storagePath, stringSerializer, stringSerializer))
+            {
+                values = tree.EnumerateFrom(tree.First().Key).ToList();
+            }
+
+            return values;
         }
     }
 }

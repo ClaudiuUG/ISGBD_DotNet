@@ -91,7 +91,7 @@ namespace KeyValueDatabaseApi.Context
             var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
             var keyValueToInsert = CreateKeyValueForData(columnNames, values, primaryKey);
 
-            ThrowIfForeignKeyConstraintsAreNotMet(tableName);
+            ThrowIfForeignKeyConstraintsAreNotMet(tableMetadata, columnNames, values);
             ThrowIfUniqueConstraintsAreNotMet(tableMetadata, values, columnNames);
             ThrowIfKeyAlreadyStored(tablePath, keyValueToInsert.Key);
 
@@ -126,10 +126,10 @@ namespace KeyValueDatabaseApi.Context
             SaveMetadataToFile();
         }
 
-        public string SelectFromTable(string tableName, List<string> columnList, string keyToFind)
+        public string SelectFromTable(string tableName, List<string> columnList, string keyColumn, string keyValue)
         {
             ThrowIfNoDatabaseInUse();
-            var resultTableRows = SelectRowFromTable(tableName, columnList, keyToFind);
+            var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
             return string.Join(" ", resultTableRows);
         }
 
@@ -260,7 +260,14 @@ namespace KeyValueDatabaseApi.Context
             {
                 var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableMetadata.TableName, index.IndexName);
                 var keyValueToInsert = CreateKeyValueForData(columnNames, values, index.IndexAttributes);
-                _dbAgent.InsertIntoStorage(indexPath, keyValueToInsert.Key, keyValueToInsert.Value);
+                var oldValue = _dbAgent.GetFromStorage(indexPath, keyValueToInsert.Key);
+                if (oldValue == null)
+                    _dbAgent.InsertIntoStorage(indexPath, keyValueToInsert.Key, keyValueToInsert.Value);
+                else
+                {
+                    _dbAgent.DeleteFromStorage(indexPath, keyValueToInsert.Key);
+                    _dbAgent.InsertIntoStorage(indexPath, keyValueToInsert.Key, oldValue + '|' + keyValueToInsert.Value);
+                }
             }
         }
 
@@ -279,19 +286,13 @@ namespace KeyValueDatabaseApi.Context
             // Don't quite get this one.
             var key = string.Empty;
             var valuesString = string.Empty;
+
             foreach (var entry in tableMetadata.ForeignKeys)
             {
                 for (var i = 0; i < values.Count; i++)
                 {
                     if (entry.Columns.FirstOrDefault().Equals(columnNames[i]))
                     {
-                        if (SelectRowFromTable(entry.ReferencedTableName, null, values[i]).Count == 0)
-                        {
-                            // This is called after everything else is inserted, throwing here would leave the database in a bad state
-                            // Since this is part of the row add and it checks constraints, it should be called the first.
-                            throw new Exception("Key does not exist");
-                        }
-
                         key = "#" + values[i];
                     }
                     valuesString += "#" + values[i];
@@ -350,34 +351,123 @@ namespace KeyValueDatabaseApi.Context
 
         }
 
-        private List<string> SelectRowFromTable(string tableName, List<string> columnNames, string searchedKeyValue)
+        private List<string> SelectRowFromTable(string tableName, List<string> columnNames, string searchedKeyColumn, string searchedKeyValue, bool foreignKeyCheck = false)
         {
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
             ThrowIfTableMetadataIsNull(tableMetadata);
 
             var key = "#" + searchedKeyValue;
-            var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
-            var resultRow = _dbAgent.GetFromStorage(tablePath, key);
+            string path = string.Empty;
+
+            if(searchedKeyColumn == null)
+            {
+                return SelectAllFromTable(tableMetadata, columnNames);
+            }
+
+            if (searchedKeyColumn.Equals(tableMetadata.PrimaryKey.PrimaryKeyAttribute) || foreignKeyCheck == true)
+            {
+                path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
+            }
+            else
+            {
+                foreach (var index in tableMetadata.IndexFiles)
+                {
+                    if (index.IndexAttributes.Contains(searchedKeyColumn))
+                    {
+                        path = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableName, index.IndexName);
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(path))
+            {
+                foreach (var uniqueKey in tableMetadata.UniqueKeyEntry)
+                {
+                    if (uniqueKey.UniqueAttribute.Equals(searchedKeyColumn))
+                    {
+                        path = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, tableName, searchedKeyColumn);
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(path))
+            {
+                return SelectAllFromTableWhere(tableMetadata, columnNames, searchedKeyColumn, searchedKeyValue);
+            }
+
+            var resultRow = _dbAgent.GetFromStorage(path, key);
+
             return resultRow != null ? FormatResultRow(resultRow, columnNames, tableMetadata) : new List<string>();
+        }
+
+        private List<string> SelectAllFromTableWhere(TableMetadataEntry tableMetadata, List<string> columnNames, string searchedKeyColumn, string searchedKeyValue)
+        {
+            var path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableMetadata.TableName);
+            List<KeyValuePair<string, string>> resultList = _dbAgent.GetAllFromStorage(path);
+            int index = -1;
+            var result = string.Empty;
+
+            foreach(var attr in tableMetadata.Structure)
+            {
+                if (attr.AttributeName.Equals(searchedKeyColumn))
+                {
+                    index = tableMetadata.Structure.IndexOf(attr);
+                }
+            }
+
+            if(index == -1)
+            {
+                throw new Exception("Column does not exist");
+            }
+
+            foreach(var row in resultList)
+            {
+                var values = row.Value.Split('#');
+                if (values[index + 1].Equals(searchedKeyValue))
+                {
+                    result += row.Value + '|';
+                }
+            }
+
+            return FormatResultRow(result, columnNames, tableMetadata);
         }
 
         private List<string> FormatResultRow(string row, List<string> columnNames, TableMetadataEntry tableMetadata)
         {
             var result = new List<string>();
-            var values = row.Split('#');
-            for (var i = 0; i < values.Length; i++)
+            var rows = row.Split('|');
+            foreach (var newRow in rows)
             {
-                if (string.IsNullOrEmpty(values[i]))
+                var values = newRow.Split('#');
+                for (var i = 0; i < values.Length; i++)
                 {
-                    continue;
+                    if (string.IsNullOrEmpty(values[i]))
+                    {
+                        continue;
+                    }
+                    if (columnNames == null || columnNames.Contains(tableMetadata.Structure.ElementAt(i).AttributeName) || columnNames.Count == 0)
+                    {
+                        result.Add(values[i]);
+                    }
                 }
-                if (columnNames == null || columnNames.Contains(tableMetadata.Structure.ElementAt(i).AttributeName) || columnNames.Count == 0)
-                {
-                    result.Add(values[i]);
-                }
+
+                result.Add(Environment.NewLine);
+            }
+            return result;
+        }
+
+        private List<string> SelectAllFromTable(TableMetadataEntry tableMetadata, List<string> columnNames)
+        {
+            var path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableMetadata.TableName);
+            List<KeyValuePair<string, string>> resultList = _dbAgent.GetAllFromStorage(path);
+            var result = string.Empty;
+
+            for (int i = 0; i < resultList.Count; i++)
+            {
+                result += resultList[i].Value + '|';
             }
 
-            return result;
+            return FormatResultRow(result, columnNames, tableMetadata);
         }
         #endregion
 
@@ -430,16 +520,22 @@ namespace KeyValueDatabaseApi.Context
             }
         }
 
-        private void ThrowIfForeignKeyConstraintsAreNotMet(string tableName)
+        private void ThrowIfForeignKeyConstraintsAreNotMet(TableMetadataEntry tableMetadata, List<string> columnNames, List<string> values)
         {
-            var foreignKeys = GetForeignKeysForTable(tableName);
-            foreach (var foreignKey in foreignKeys)
+            foreach (var entry in tableMetadata.ForeignKeys)
             {
-                var tableColumns = foreignKey.Columns;
-                var referencedTable = foreignKey.ReferencedTableName;
-                var referencedColumns = foreignKey.ReferencedTableColumns;
-                // should use or create index on the referenced table to check that there are entries that meet the constratint
-                // first, we should have working indexes
+                for (var i = 0; i < values.Count; i++)
+                {
+                    if (entry.Columns.FirstOrDefault().Equals(columnNames[i]))
+                    {
+                        if (SelectRowFromTable(entry.ReferencedTableName, null, columnNames[i], values[i], true).Count == 0)
+                        {
+                            // This is called after everything else is inserted, throwing here would leave the database in a bad state
+                            // Since this is part of the row add and it checks constraints, it should be called the first.
+                            throw new Exception("Key does not exist");
+                        }
+                    }
+                }
             }
         }
 

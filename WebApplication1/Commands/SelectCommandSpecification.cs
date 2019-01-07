@@ -21,7 +21,7 @@ namespace KeyValueDatabaseApi.Commands
             RegexStrings.FromReservedWordRegex +
             RegexStrings.IdentifierRegex +
             RegexStrings.WhereReservedWordRegex +
-            RegexStrings.KeyReservedWordRegex +
+            RegexStrings.IdentifierRegex +
             RegexStrings.EqualOperatorRegex +
             RegexStrings.RowEntryValueWithSpaces +
             "$";
@@ -49,10 +49,13 @@ namespace KeyValueDatabaseApi.Commands
 
             if (hasWhereClause)
             {
+                var indexOfWhere = command.IndexOf(RegexStrings.WhereReservedWordWithoutSpacesRegex, StringComparison.Ordinal);
+                var commandAfterWhere = command.Remove(0, indexOfWhere + RegexStrings.WhereReservedWordWithoutSpacesRegex.Length);
+                var columnName = Regex.Match(commandAfterWhere, RegexStrings.IdentifierRegex).Value;
                 var indexOfEqual = command.IndexOf(RegexStrings.EqualOperator, StringComparison.Ordinal);
                 var commandFromEquals = command.Remove(0, indexOfEqual);
                 var keyToFind = Regex.Match(commandFromEquals, RegexStrings.RowEntryValue).Value;
-                parsedCommand = new SelectCommand(tableName, keyToFind);
+                parsedCommand = new SelectCommand(tableName, columnName, keyToFind);
                 return true;
             }
 

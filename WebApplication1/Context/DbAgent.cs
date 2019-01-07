@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using DataTanker;
 using DataTanker.Settings;
 using KeyValueDatabaseApi.Exceptions;
@@ -70,6 +71,11 @@ namespace KeyValueDatabaseApi.Context
         }
 
         public void ClearStorage(string storagePath)
+        {
+            throw new NotImplementedException();
+        }
+
+        public List<KeyValuePair<string, string>> GetAllFromStorage(string storagePath)
         {
             throw new NotImplementedException();
         }
