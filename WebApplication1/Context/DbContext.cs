@@ -129,8 +129,10 @@ namespace KeyValueDatabaseApi.Context
         public string SelectFromTable(string tableName, List<string> columnList, string keyColumn, string keyValue)
         {
             ThrowIfNoDatabaseInUse();
-            var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
-            return string.Join(" ", resultTableRows);
+            //var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
+            //return string.Join(" ", resultTableRows);
+
+            return GroupByHavingCountGreaterThan("note", "nota", 2, "=");
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -223,40 +225,52 @@ namespace KeyValueDatabaseApi.Context
         public string GroupBy(string tableName, string groupByColumn)
         {
             ThrowIfNoDatabaseInUse();
-
             var table = GetTableFromCurrentDatabase(tableName);
             ThrowIfTableMetadataIsNull(table, tableName);
 
-            if (table.PrimaryKey.PrimaryKeyAttribute.Equals(groupByColumn))
-            {
-                return string.Join("    ", SelectGroupBy(table, PathHelper.GetTablePath(_currentDatabase.DatabaseName, table.TableName)));
-            }
-
-            foreach (var uniqueKey in table.UniqueKeyEntry)
-            {
-                if (uniqueKey.UniqueAttribute.Equals(groupByColumn))
-                {
-                    return string.Join("    ", SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, uniqueKey.UniqueAttribute)));
-                }
-            }
-
-            foreach (var index in table.IndexFiles)
-            {
-                if (index.IndexAttributes.Contains(groupByColumn))
-                {
-                    return string.Join("    ", SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, index.IndexName)));
-                }
-            }
-
-            foreach (var foreignKey in table.ForeignKeys)
-            {
-                if (foreignKey.Columns.Contains(groupByColumn))
-                {
-                    return string.Join("    ", SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, foreignKey.ReferencedTableName)));
-                }
-            }
-
             return string.Join("    ", SelectGroupByForGivenColumn(table, groupByColumn));
+        }
+
+        public string GroupByHavingCountGreaterThan(string tableName, string groupByColumn, int value, string comparer)
+        {
+            ThrowIfNoDatabaseInUse();
+            var table = GetTableFromCurrentDatabase(tableName);
+            ThrowIfTableMetadataIsNull(table, tableName);
+
+            List<string> result = new List<string>();
+
+            var groupBy = SelectGroupByForGivenColumn(table, groupByColumn);
+
+            foreach(var group in groupBy)
+            {
+                if (comparer.Equals(">"))
+                {
+                    if (Count(group) > value)
+                        result.Add(group);
+                }
+                else if (comparer.Equals("<"))
+                {
+                    if (Count(group) < value)
+                        result.Add(group);
+                }
+                else if (comparer.Equals(">="))
+                {
+                    if (Count(group) >= value)
+                        result.Add(group);
+                }
+                else if (comparer.Equals("<="))
+                {
+                    if (Count(group) <= value)
+                        result.Add(group);
+                }
+                else if (comparer.Equals("="))
+                {
+                    if (Count(group) == value)
+                        result.Add(group);
+                }
+            }
+
+            return string.Join("    ", result);
         }
         #endregion
 
@@ -542,14 +556,15 @@ namespace KeyValueDatabaseApi.Context
 
         private List<string> FormatResultRow(string row, List<string> columnNames, TableMetadataEntry tableMetadata)
         {
+            var count = Count(row);
             var result = new List<string>();
             var rows = row.Split('|');
-            foreach (var newRow in rows)
+            foreach (string newRow in rows)
             {
                 var values = newRow.Split('#');
                 for (var i = 0; i < values.Length; i++)
                 {
-                    if (string.IsNullOrEmpty(values[i]))
+                    if (string.IsNullOrEmpty(values[i].Trim()))
                     {
                         continue;
                     }
@@ -671,6 +686,35 @@ namespace KeyValueDatabaseApi.Context
 
         private List<string> SelectGroupByForGivenColumn(TableMetadataEntry table, string groupByColumn)
         {
+            if (table.PrimaryKey.PrimaryKeyAttribute.Equals(groupByColumn))
+            {
+                return SelectGroupBy(table, PathHelper.GetTablePath(_currentDatabase.DatabaseName, table.TableName));
+            }
+
+            foreach (var uniqueKey in table.UniqueKeyEntry)
+            {
+                if (uniqueKey.UniqueAttribute.Equals(groupByColumn))
+                {
+                    return SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, uniqueKey.UniqueAttribute));
+                }
+            }
+
+            foreach (var index in table.IndexFiles)
+            {
+                if (index.IndexAttributes.Contains(groupByColumn))
+                {
+                    return SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, index.IndexName));
+                }
+            }
+
+            foreach (var foreignKey in table.ForeignKeys)
+            {
+                if (foreignKey.Columns.Contains(groupByColumn))
+                {
+                    return SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, foreignKey.ReferencedTableName));
+                }
+            }
+
             var dictionary = GetHashTableForGivenColumn(table, groupByColumn);
             List<string> result = new List<string>();
 
@@ -734,6 +778,20 @@ namespace KeyValueDatabaseApi.Context
             }
 
             return hashTable;
+        }
+
+        private int Count(string row)
+        {
+            int count = 0;
+            var values = row.Split(':').LastOrDefault().Split('|');
+
+            foreach(var value in values)
+            {
+                if (!string.IsNullOrEmpty(value.Trim()))
+                    count++;
+            }
+
+            return count;
         }
 
         #endregion
