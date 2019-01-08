@@ -76,7 +76,7 @@ namespace KeyValueDatabaseApi.Context
             ThrowIfNoDatabaseInUse();
 
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
-            ThrowIfTableMetadataIsNull(tableMetadata);
+            ThrowIfTableMetadataIsNull(tableMetadata, tableName);
 
             var primaryKey = tableMetadata.PrimaryKey.PrimaryKeyAttribute;
             ThrowIfPrimaryKeyIsNull(primaryKey);
@@ -111,7 +111,7 @@ namespace KeyValueDatabaseApi.Context
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
 
             key = "#" + key;
-            ThrowIfTableMetadataIsNull(tableMetadata);
+            ThrowIfTableMetadataIsNull(tableMetadata, tableName);
 
 
             var primaryKey = tableMetadata.PrimaryKey.PrimaryKeyAttribute;
@@ -162,6 +162,34 @@ namespace KeyValueDatabaseApi.Context
             table.ForeignKeys.Add(foreignKeyEntry);
             SaveMetadataToFile();
         }
+
+        public string IndexedNestedLoopJoin(string tableName1, string tableName2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        {
+            ThrowIfNoDatabaseInUse();
+            var table1 = GetTableFromCurrentDatabase(tableName1);
+            var table2 = GetTableFromCurrentDatabase(tableName2);
+
+            ThrowIfTableMetadataIsNull(table1, tableName1);
+            ThrowIfTableMetadataIsNull(table2, tableName2);
+
+            List<string> result = new List<string>();
+
+            if (table1.PrimaryKey.PrimaryKeyAttribute.Equals(joinColumn1))
+            {
+                result = SelectFromJoinTables(table1, table2, joinColumn1, joinColumn2, columnNames);
+            }
+            if (table2.PrimaryKey.PrimaryKeyAttribute.Equals(joinColumn2))
+            {
+                result = SelectFromJoinTables(table2, table1, joinColumn2, joinColumn1, columnNames);
+            }
+
+            if (result == null)
+            {
+                throw new Exception("Something is wrong");
+            }
+
+            return string.Join("    ", result);
+        }
         #endregion
 
         #region Helpers
@@ -204,7 +232,7 @@ namespace KeyValueDatabaseApi.Context
         private TableMetadataEntry GetTableFromCurrentDatabase(string tableName)
         {
             var tableMetadata = _currentDatabase.Tables.SingleOrDefault(table => table.TableName.Equals(tableName));
-            ThrowIfTableMetadataIsNull(tableMetadata);
+            ThrowIfTableMetadataIsNull(tableMetadata, tableName);
 
             return tableMetadata;
         }
@@ -262,7 +290,9 @@ namespace KeyValueDatabaseApi.Context
                 var keyValueToInsert = CreateKeyValueForData(columnNames, values, index.IndexAttributes);
                 var oldValue = _dbAgent.GetFromStorage(indexPath, keyValueToInsert.Key);
                 if (oldValue == null)
+                {
                     _dbAgent.InsertIntoStorage(indexPath, keyValueToInsert.Key, keyValueToInsert.Value);
+                }
                 else
                 {
                     _dbAgent.DeleteFromStorage(indexPath, keyValueToInsert.Key);
@@ -284,11 +314,12 @@ namespace KeyValueDatabaseApi.Context
         private void UpdateForeignKeys(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
         {
             // Don't quite get this one.
-            var key = string.Empty;
-            var valuesString = string.Empty;
 
             foreach (var entry in tableMetadata.ForeignKeys)
             {
+                var key = string.Empty;
+                var valuesString = string.Empty;
+
                 for (var i = 0; i < values.Count; i++)
                 {
                     if (entry.Columns.FirstOrDefault().Equals(columnNames[i]))
@@ -299,7 +330,16 @@ namespace KeyValueDatabaseApi.Context
                 }
 
                 var referencedTableStoragePath = PathHelper.GetReferencedTablePath(_currentDatabase.DatabaseName, tableMetadata.TableName, entry.ReferencedTableName);
-                _dbAgent.InsertIntoStorage(referencedTableStoragePath, key, valuesString);
+                var oldValue = _dbAgent.GetFromStorage(referencedTableStoragePath, key);
+                if (oldValue == null)
+                {
+                    _dbAgent.InsertIntoStorage(referencedTableStoragePath, key, valuesString);
+                }
+                else
+                {
+                    _dbAgent.DeleteFromStorage(referencedTableStoragePath, key);
+                    _dbAgent.InsertIntoStorage(referencedTableStoragePath, key, oldValue + '|' + valuesString);
+                }
             }
         }
 
@@ -354,12 +394,12 @@ namespace KeyValueDatabaseApi.Context
         private List<string> SelectRowFromTable(string tableName, List<string> columnNames, string searchedKeyColumn, string searchedKeyValue, bool foreignKeyCheck = false)
         {
             var tableMetadata = GetTableFromCurrentDatabase(tableName);
-            ThrowIfTableMetadataIsNull(tableMetadata);
+            ThrowIfTableMetadataIsNull(tableMetadata, tableName);
 
             var key = "#" + searchedKeyValue;
             string path = string.Empty;
 
-            if(searchedKeyColumn == null)
+            if (searchedKeyColumn == null)
             {
                 return SelectAllFromTable(tableMetadata, columnNames);
             }
@@ -407,7 +447,7 @@ namespace KeyValueDatabaseApi.Context
             int index = -1;
             var result = string.Empty;
 
-            foreach(var attr in tableMetadata.Structure)
+            foreach (var attr in tableMetadata.Structure)
             {
                 if (attr.AttributeName.Equals(searchedKeyColumn))
                 {
@@ -415,12 +455,12 @@ namespace KeyValueDatabaseApi.Context
                 }
             }
 
-            if(index == -1)
+            if (index == -1)
             {
                 throw new Exception("Column does not exist");
             }
 
-            foreach(var row in resultList)
+            foreach (var row in resultList)
             {
                 var values = row.Value.Split('#');
                 if (values[index + 1].Equals(searchedKeyValue))
@@ -450,9 +490,8 @@ namespace KeyValueDatabaseApi.Context
                         result.Add(values[i]);
                     }
                 }
-
-                result.Add(Environment.NewLine);
             }
+
             return result;
         }
 
@@ -468,6 +507,44 @@ namespace KeyValueDatabaseApi.Context
             }
 
             return FormatResultRow(result, columnNames, tableMetadata);
+        }
+
+        private List<string> SelectFromJoinTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        {
+            List<string> result = new List<string>();
+
+            foreach (var foreignKey in table2.ForeignKeys)
+            {
+                if (foreignKey.Columns.Contains(joinColumn2))
+                {
+                    var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table1.TableName);
+                    var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table2.TableName, table1.TableName);
+                    var table1Data = _dbAgent.GetAllFromStorage(tablePath);
+
+                    foreach (var entry in table1Data)
+                    {
+                        var key = entry.Key;
+                        var value = _dbAgent.GetFromStorage(indexPath, key);
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            if (!value.Contains('|'))
+                            {
+                                result.Add(string.Join(" ", FormatResultRow(entry.Value + value, columnNames, table1)));
+                            }
+                            else
+                            {
+                                var values = value.Split('|');
+                                foreach (var newValue in values)
+                                {
+                                    result.Add(string.Join(" ", FormatResultRow(entry.Value + newValue, columnNames, table1)));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return result;
         }
         #endregion
 
@@ -555,11 +632,11 @@ namespace KeyValueDatabaseApi.Context
             }
         }
 
-        private void ThrowIfTableMetadataIsNull(TableMetadataEntry tableMetadata)
+        private void ThrowIfTableMetadataIsNull(TableMetadataEntry tableMetadata, string tableName)
         {
             if (tableMetadata == null)
             {
-                throw new TableDoesNotExistException(_currentDatabase.DatabaseName, tableMetadata.TableName);
+                throw new TableDoesNotExistException(_currentDatabase.DatabaseName, tableName);
             }
         }
 
