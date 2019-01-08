@@ -132,7 +132,7 @@ namespace KeyValueDatabaseApi.Context
             //var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
             //return string.Join(" ", resultTableRows);
 
-            return GroupByHavingCountGreaterThan("note", "nota", 2, "=");
+            return GroupByHavingSum("note", "nota", 7, ">");
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -231,7 +231,7 @@ namespace KeyValueDatabaseApi.Context
             return string.Join("    ", SelectGroupByForGivenColumn(table, groupByColumn));
         }
 
-        public string GroupByHavingCountGreaterThan(string tableName, string groupByColumn, int value, string comparer)
+        public string GroupByHavingCount(string tableName, string groupByColumn, int value, string comparer)
         {
             ThrowIfNoDatabaseInUse();
             var table = GetTableFromCurrentDatabase(tableName);
@@ -266,6 +266,50 @@ namespace KeyValueDatabaseApi.Context
                 else if (comparer.Equals("="))
                 {
                     if (Count(group) == value)
+                        result.Add(group);
+                }
+            }
+
+            return string.Join("    ", result);
+        }
+
+        public string GroupByHavingSum(string tableName, string groupByColumn, int value, string comparer)
+        {
+            ThrowIfNoDatabaseInUse();
+            var table = GetTableFromCurrentDatabase(tableName);
+            ThrowIfTableMetadataIsNull(table, tableName);
+            ThrowIfColumnIsNotInt(table, groupByColumn);
+
+            List<string> result = new List<string>();
+
+            var groupBy = SelectGroupByForGivenColumn(table, groupByColumn);
+            int index = GetColumnIndex(table, groupByColumn);
+
+            foreach (var group in groupBy)
+            {
+                if (comparer.Equals(">"))
+                {
+                    if (Sum(group, index) > value)
+                        result.Add(group);
+                }
+                else if (comparer.Equals("<"))
+                {
+                    if (Sum(group, index) < value)
+                        result.Add(group);
+                }
+                else if (comparer.Equals(">="))
+                {
+                    if (Sum(group, index) >= value)
+                        result.Add(group);
+                }
+                else if (comparer.Equals("<="))
+                {
+                    if (Sum(group, index) <= value)
+                        result.Add(group);
+                }
+                else if (comparer.Equals("="))
+                {
+                    if (Sum(group, index) == value)
                         result.Add(group);
                 }
             }
@@ -794,6 +838,36 @@ namespace KeyValueDatabaseApi.Context
             return count;
         }
 
+        private int Sum(string row, int columnIndex)
+        {
+            int sum = 0;
+            var values = row.Split(':').LastOrDefault().Split('|');
+
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrEmpty(value.Trim()))
+                {
+                    var columns = value.Split(' ');
+                    sum +=Int32.Parse(columns[columnIndex+1]);
+                }
+            }
+
+            return sum;
+        }
+
+        private int GetColumnIndex(TableMetadataEntry table, string columnName)
+        {
+            int index = -1;
+            foreach (var column in table.Structure)
+            {
+                if (column.AttributeName.Equals(columnName))
+                {
+                    index = table.Structure.IndexOf(column);
+                }
+            }
+
+            return index;
+        }
         #endregion
 
         #region Throw
@@ -915,6 +989,14 @@ namespace KeyValueDatabaseApi.Context
             {
                 throw new DataBaseDoesNotExistException();
             }
+        }
+
+        private void ThrowIfColumnIsNotInt(TableMetadataEntry tableMetadata, string columnName)
+        {
+                if(!tableMetadata.Structure[GetColumnIndex(tableMetadata, columnName)].Type.Equals("int"))
+                {
+                    throw new Exception("Only int can be summed");
+                }
         }
 
         #endregion
