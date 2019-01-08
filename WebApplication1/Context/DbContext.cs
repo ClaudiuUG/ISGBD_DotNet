@@ -129,8 +129,10 @@ namespace KeyValueDatabaseApi.Context
         public string SelectFromTable(string tableName, List<string> columnList, string keyColumn, string keyValue)
         {
             ThrowIfNoDatabaseInUse();
-            var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
-            return string.Join(" ", resultTableRows);
+            //var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
+            //return string.Join(" ", resultTableRows);
+
+            return HashJoin("materii", "studenti", "cod", "nrmatricol", null);
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -176,11 +178,40 @@ namespace KeyValueDatabaseApi.Context
 
             if (table1.PrimaryKey.PrimaryKeyAttribute.Equals(joinColumn1))
             {
-                result = SelectFromJoinTables(table1, table2, joinColumn1, joinColumn2, columnNames);
+                result = SelectFromJoinedTables(table1, table2, joinColumn1, joinColumn2, columnNames);
             }
             if (table2.PrimaryKey.PrimaryKeyAttribute.Equals(joinColumn2))
             {
-                result = SelectFromJoinTables(table2, table1, joinColumn2, joinColumn1, columnNames);
+                result = SelectFromJoinedTables(table2, table1, joinColumn2, joinColumn1, columnNames);
+            }
+
+            if (result == null)
+            {
+                throw new Exception("Something is wrong");
+            }
+
+            return string.Join("    ", result);
+        }
+
+        public string HashJoin(string tableName1, string tableName2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        {
+            ThrowIfNoDatabaseInUse();
+            var table1 = GetTableFromCurrentDatabase(tableName1);
+            var table2 = GetTableFromCurrentDatabase(tableName2);
+
+            ThrowIfTableMetadataIsNull(table1, tableName1);
+            ThrowIfTableMetadataIsNull(table2, tableName2);
+
+            List<string> result = new List<string>();
+
+            if (table1.PrimaryKey.PrimaryKeyAttribute.Equals(joinColumn1))
+            {
+                result = SelectFromHashJoinedTables(table1, table2, joinColumn1, joinColumn2, columnNames);
+            }
+
+            if (table2.PrimaryKey.PrimaryKeyAttribute.Equals(joinColumn2))
+            {
+                result = SelectFromHashJoinedTables(table2, table1, joinColumn2, joinColumn1, columnNames);
             }
 
             if (result == null)
@@ -509,7 +540,7 @@ namespace KeyValueDatabaseApi.Context
             return FormatResultRow(result, columnNames, tableMetadata);
         }
 
-        private List<string> SelectFromJoinTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        private List<string> SelectFromJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
         {
             List<string> result = new List<string>();
 
@@ -545,6 +576,59 @@ namespace KeyValueDatabaseApi.Context
             }
 
             return result;
+        }
+
+        private List<string> SelectFromHashJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        {
+            List<string> result = new List<string>();
+            var hashTable1 = GetHashTableForRelation(table1);
+
+            foreach (var foreignKey in table2.ForeignKeys)
+            {
+                if (foreignKey.Columns.Contains(joinColumn2))
+                {
+                    var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table2.TableName, table1.TableName);
+                    var table2Data = _dbAgent.GetAllFromStorage(indexPath);
+
+                    foreach (var entry in table2Data)
+                    {
+                        var key = entry.Key;
+                        string value = string.Empty;
+                        hashTable1.TryGetValue(key, out value);
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            if (!entry.Value.Contains('|'))
+                            {
+                                result.Add(string.Join(" ", FormatResultRow(value + entry.Value, columnNames, table1)));
+                            }
+                            else
+                            {
+                                var values = entry.Value.Split('|');
+                                foreach (var newValue in values)
+                                {
+                                    result.Add(string.Join(" ", FormatResultRow(value + newValue, columnNames, table1)));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private Dictionary<string, string> GetHashTableForRelation(TableMetadataEntry table)
+        {
+            var hashTable = new Dictionary<string, string>();
+            var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table.TableName);
+            var rows = _dbAgent.GetAllFromStorage(tablePath);
+
+            foreach (var row in rows)
+            {
+                hashTable.Add(row.Key, row.Value);
+            }
+
+            return hashTable;
         }
         #endregion
 
