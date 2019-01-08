@@ -129,10 +129,8 @@ namespace KeyValueDatabaseApi.Context
         public string SelectFromTable(string tableName, List<string> columnList, string keyColumn, string keyValue)
         {
             ThrowIfNoDatabaseInUse();
-            //var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
-            //return string.Join(" ", resultTableRows);
-
-            return HashJoin("materii", "studenti", "cod", "nrmatricol", null);
+            var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
+            return string.Join(" ", resultTableRows);
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -220,6 +218,45 @@ namespace KeyValueDatabaseApi.Context
             }
 
             return string.Join("    ", result);
+        }
+
+        public string GroupBy(string tableName, string groupByColumn)
+        {
+            ThrowIfNoDatabaseInUse();
+
+            var table = GetTableFromCurrentDatabase(tableName);
+            ThrowIfTableMetadataIsNull(table, tableName);
+
+            if (table.PrimaryKey.PrimaryKeyAttribute.Equals(groupByColumn))
+            {
+                return string.Join("    ", SelectGroupBy(table, PathHelper.GetTablePath(_currentDatabase.DatabaseName, table.TableName)));
+            }
+
+            foreach (var uniqueKey in table.UniqueKeyEntry)
+            {
+                if (uniqueKey.UniqueAttribute.Equals(groupByColumn))
+                {
+                    return string.Join("    ", SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, uniqueKey.UniqueAttribute)));
+                }
+            }
+
+            foreach (var index in table.IndexFiles)
+            {
+                if (index.IndexAttributes.Contains(groupByColumn))
+                {
+                    return string.Join("    ", SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, index.IndexName)));
+                }
+            }
+
+            foreach (var foreignKey in table.ForeignKeys)
+            {
+                if (foreignKey.Columns.Contains(groupByColumn))
+                {
+                    return string.Join("    ", SelectGroupBy(table, PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table.TableName, foreignKey.ReferencedTableName)));
+                }
+            }
+
+            return string.Join("    ", SelectGroupByForGivenColumn(table, groupByColumn));
         }
         #endregion
 
@@ -521,6 +558,8 @@ namespace KeyValueDatabaseApi.Context
                         result.Add(values[i]);
                     }
                 }
+
+                result.Add(" | ");
             }
 
             return result;
@@ -617,6 +656,38 @@ namespace KeyValueDatabaseApi.Context
             return result;
         }
 
+        private List<string> SelectGroupBy(TableMetadataEntry table, string path)
+        {
+            List<KeyValuePair<string, string>> resultList = _dbAgent.GetAllFromStorage(path);
+            List<string> result = new List<string>();
+
+            foreach (var row in resultList)
+            {
+                result.Add(row.Key + " : " + string.Join(" ", FormatResultRow(row.Value, null, table)));
+            }
+
+            return result;
+        }
+
+        private List<string> SelectGroupByForGivenColumn(TableMetadataEntry table, string groupByColumn)
+        {
+            var dictionary = GetHashTableForGivenColumn(table, groupByColumn);
+            List<string> result = new List<string>();
+
+            foreach(var row in dictionary)
+            {
+                string values = string.Empty;
+                foreach(var value in row.Value)
+                {
+                    values += value + '|';
+                }
+
+                result.Add(row.Key + " : " + string.Join(" ", FormatResultRow(values, null, table)));
+            }
+
+            return result;
+        }
+
         private Dictionary<string, string> GetHashTableForRelation(TableMetadataEntry table)
         {
             var hashTable = new Dictionary<string, string>();
@@ -630,6 +701,41 @@ namespace KeyValueDatabaseApi.Context
 
             return hashTable;
         }
+
+        private Dictionary<string, List<string>> GetHashTableForGivenColumn(TableMetadataEntry table, string columnName)
+        {
+            var hashTable = new Dictionary<string, List<string>>();
+            var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table.TableName);
+            var rows = _dbAgent.GetAllFromStorage(tablePath);
+            var index = -1;
+
+            foreach(var column in table.Structure)
+            {
+                if (column.AttributeName.Equals(columnName))
+                {
+                    index = table.Structure.IndexOf(column);
+                }
+            }
+
+            if (index == -1)
+                throw new Exception("Column does not exist");
+
+            foreach (var row in rows)
+            {
+                var values = row.Value.Split('#');
+                if(hashTable.ContainsKey(values[index + 1]))
+                {
+                    hashTable[values[index + 1]].Add(row.Value);
+                }
+                else
+                {
+                    hashTable.Add(values[index + 1], new List<string> { row.Value });
+                }
+            }
+
+            return hashTable;
+        }
+
         #endregion
 
         #region Throw
