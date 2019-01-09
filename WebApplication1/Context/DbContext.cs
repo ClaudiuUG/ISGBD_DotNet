@@ -129,10 +129,10 @@ namespace KeyValueDatabaseApi.Context
         public string SelectFromTable(string tableName, List<string> columnList, string keyColumn, string keyValue)
         {
             ThrowIfNoDatabaseInUse();
-            //var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
-            //return string.Join(" ", resultTableRows);
+            var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
+            return string.Join(" ", resultTableRows);
 
-            return GroupByHavingSum("note", "nota", 7, ">");
+            // return GroupByHavingSum("note", "nota", 7, ">");
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -237,7 +237,7 @@ namespace KeyValueDatabaseApi.Context
             var table = GetTableFromCurrentDatabase(tableName);
             ThrowIfTableMetadataIsNull(table, tableName);
 
-            List<string> result = new List<string>();
+            var result = new List<string>();
 
             var groupBy = SelectGroupByForGivenColumn(table, groupByColumn);
 

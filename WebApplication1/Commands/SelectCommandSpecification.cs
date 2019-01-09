@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Text.RegularExpressions;
 using KeyValueDatabaseApi.Matchers;
 
@@ -24,8 +25,16 @@ namespace KeyValueDatabaseApi.Commands
             RegexStrings.RowEntryValueWithSpaces +
             "$";
 
+        private readonly string _groupByRegex =
+            RegexStrings.GroupByReservedWordsRegex +
+            RegexStrings.IdentifierRegex;
+
+
         public bool TryParse(string command, out ICommand parsedCommand)
         {
+            var groupByMatch = Regex.Match(command, _groupByRegex);
+            var hasGroupBy = groupByMatch.Success;
+
             var hasWhereClause = true;
             var selectWhereMatch = Regex.Match(command, _selectWhereRegex);
             if (!selectWhereMatch.Success)
@@ -55,6 +64,11 @@ namespace KeyValueDatabaseApi.Commands
                 var keyToFind = Regex.Match(commandFromEquals, RegexStrings.RowEntryValue).Value;
                 parsedCommand = new SelectCommand(tableName, columnName, keyToFind);
                 return true;
+            }
+
+            if (hasGroupBy)
+            {
+                throw new NotImplementedException();
             }
 
             parsedCommand = new SelectCommand(tableName);

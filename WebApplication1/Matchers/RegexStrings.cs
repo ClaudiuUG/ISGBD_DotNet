@@ -52,5 +52,6 @@ namespace KeyValueDatabaseApi.Matchers
         public static string JoinReservedWordRegex = $@"\s*{JoinWithoutSpacesRegex}\s*";
         public static string PrefixedColumnWithoutSpacesRegex = IdentifierRegex + "." + IdentifierRegex;
         public static string PrefixedColumnRegex = $@"\s*{PrefixedColumnWithoutSpacesRegex}\s*";
+        public static string GroupByReservedWordsRegex = @"\s*group\s*by\s*";
     }
 }
