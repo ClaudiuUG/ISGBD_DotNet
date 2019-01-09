@@ -17,6 +17,7 @@ namespace KeyValueDatabaseApi.Parsers
             new InsertIntoCommandSpecification(),
             new DeleteFromCommandSpecification(),
             new AddForeignKeyCommandSpecification(),
+            new JoinCommandSpecification(),
             new SelectCommandSpecification()
         };
 

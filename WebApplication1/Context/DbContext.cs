@@ -160,7 +160,7 @@ namespace KeyValueDatabaseApi.Context
             ThrowIfNoDatabaseInUse();
 
             var table = GetTableFromCurrentDatabase(tableName);
-            ForeignKeyEntry foreignKeyEntry = new ForeignKeyEntry(tableColumns, referencedTableName, referencedTableColumns);
+            var foreignKeyEntry = new ForeignKeyEntry(tableColumns, referencedTableName, referencedTableColumns);
             table.ForeignKeys.Add(foreignKeyEntry);
             SaveMetadataToFile();
         }
@@ -174,7 +174,7 @@ namespace KeyValueDatabaseApi.Context
             ThrowIfTableMetadataIsNull(table1, tableName1);
             ThrowIfTableMetadataIsNull(table2, tableName2);
 
-            List<string> result = new List<string>();
+            var result = new List<string>();
 
             if (table1.PrimaryKey.PrimaryKeyAttribute.Equals(joinColumn1))
             {

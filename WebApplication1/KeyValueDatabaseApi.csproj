@@ -172,6 +172,8 @@
     <Compile Include="Commands\ICommandSpecification.cs" />
     <Compile Include="Commands\InsertIntoCommand.cs" />
     <Compile Include="Commands\InsertIntoCommandSpecification.cs" />
+    <Compile Include="Commands\JoinCommand.cs" />
+    <Compile Include="Commands\JoinCommandSpecification.cs" />
     <Compile Include="Commands\SelectCommand.cs" />
     <Compile Include="Commands\SelectCommandSpecification.cs" />
     <Compile Include="Commands\UseDatabaseCommand.cs" />

@@ -11,7 +11,8 @@ namespace KeyValueDatabaseApi.Matchers
         public static string DatabaseReservedWordRegex = @"\s*database\s*";
         public static string TableReservedWordRegex = @"\s*table\s*";
         public static string IndexReservedWordRegex = @"\s*index\s*";
-        public static string OnReservedWordRegex = @"\s*on\s*";
+        public static string OnReservedWordWithoutSpacesRegex = "on";
+        public static string OnReservedWordRegex = $@"\s*{OnReservedWordWithoutSpacesRegex}\s*";
         public static string ValuesReservedKeyword = @"\s*values\s*";
         public static string IdentifierRegex = "[A-Za-z0-9][A-Za-z0-9]*";
         public static string IdentifierRegexWithSpaces = @"\s*[A-Za-z][A-Za-z0-9]*\s*";
@@ -45,5 +46,11 @@ namespace KeyValueDatabaseApi.Matchers
         public static string SelectReservedWordWithoutSpacesRegex = "select";
         public static string SelectReservedWordRegex = $@"\s*{SelectReservedWordWithoutSpacesRegex}\s*";
         public static string SelectSubject = @"\*";
+        public static string JoinTypeWithoutSpacesRegex = @"loop|hash";
+        public static string JoinTypeRegex = $@"\s*{JoinTypeWithoutSpacesRegex}\s*";
+        public static string JoinWithoutSpacesRegex = "join";
+        public static string JoinReservedWordRegex = $@"\s*{JoinWithoutSpacesRegex}\s*";
+        public static string PrefixedColumnWithoutSpacesRegex = IdentifierRegex + "." + IdentifierRegex;
+        public static string PrefixedColumnRegex = $@"\s*{PrefixedColumnWithoutSpacesRegex}\s*";
     }
 }
