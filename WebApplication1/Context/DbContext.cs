@@ -130,10 +130,10 @@ namespace KeyValueDatabaseApi.Context
         {
             ThrowIfNoDatabaseInUse();
             var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
-            return string.Join(" ", resultTableRows);
+            //return string.Join(" ", resultTableRows);
 
             //return GroupByHavingCount("studenti", "varsta", 2, "<");
-            //return GroupByHavingSum("note", "nota", 7, ">");
+            return GroupByHavingSum("note", "nota", 7, ">");
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -315,27 +315,27 @@ namespace KeyValueDatabaseApi.Context
                 if (comparer.Equals(">"))
                 {
                     if (Sum(group, index) > value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
                 }
                 else if (comparer.Equals("<"))
                 {
                     if (Sum(group, index) < value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
                 }
                 else if (comparer.Equals(">="))
                 {
                     if (Sum(group, index) >= value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
                 }
                 else if (comparer.Equals("<="))
                 {
                     if (Sum(group, index) <= value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
                 }
                 else if (comparer.Equals("="))
                 {
                     if (Sum(group, index) == value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
                 }
             }
 
