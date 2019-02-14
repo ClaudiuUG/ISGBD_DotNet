@@ -11,7 +11,7 @@ namespace KeyValueDatabaseApi.Commands
         private readonly string _joinRegex = 
             "^" +
             RegexStrings.SelectReservedWordRegex +
-            RegexStrings.TableColumnsWithoutParenthesesRegex +
+            RegexStrings.SelectSubject +
             RegexStrings.FromReservedWordRegex +
             RegexStrings.IdentifierRegex +
             RegexStrings.JoinTypeRegex +
@@ -33,28 +33,28 @@ namespace KeyValueDatabaseApi.Commands
             }
 
             var indexOfFrom = command.IndexOf(RegexStrings.FromReservedWordWithoutSpacesRegex, StringComparison.Ordinal);
-            var commandAfterSelect = command.Skip(RegexStrings.SelectReservedWordWithoutSpacesRegex.Length + 1);
-            var columns = commandAfterSelect.Take(indexOfFrom).ToString().Replace(" ", string.Empty).Split(',').ToList();
+            var commandAfterSelect = command.Remove(0, RegexStrings.SelectReservedWordWithoutSpacesRegex.Length + 1).ToString();
+            // var columns = commandAfterSelect.Take(indexOfFrom).ToString().Replace(" ", string.Empty).Split(',').ToList();
 
-            var commandAfterFrom = command.Remove(0, indexOfFrom + RegexStrings.FromReservedWordWithoutSpacesRegex.Length);
+            var commandAfterFrom = command.Remove(0, indexOfFrom + RegexStrings.FromReservedWordWithoutSpacesRegex.Length + 1);
             var tableName = Regex.Match(commandAfterFrom, RegexStrings.IdentifierRegex).Value;
 
             var joinType = Regex.Match(command, RegexStrings.JoinTypeWithoutSpacesRegex).Value;
 
             var indexOfJoin = command.IndexOf(RegexStrings.JoinWithoutSpacesRegex, StringComparison.Ordinal);
-            var commandAfterJoin = command.Remove(0, indexOfJoin + RegexStrings.JoinWithoutSpacesRegex.Length);
+            var commandAfterJoin = command.Remove(0, indexOfJoin + RegexStrings.JoinWithoutSpacesRegex.Length).TrimStart();
 
-            var tableToJoin = Regex.Match(RegexStrings.IdentifierRegex, commandAfterJoin).Value;
+            var tableToJoin = Regex.Match(commandAfterJoin, RegexStrings.IdentifierRegex).Value;
 
             var indexOfOn = command.IndexOf(RegexStrings.OnReservedWordWithoutSpacesRegex, StringComparison.Ordinal);
             var commandAfterOn = command.Remove(0, indexOfOn + RegexStrings.OnReservedWordWithoutSpacesRegex.Length);
 
             var prefixedColumnsMatch = Regex.Match(commandAfterOn, RegexStrings.PrefixedColumnWithoutSpacesRegex);
             var firstPrefixedColumn = GetPrefixedColumnFromString(prefixedColumnsMatch.Value);
-            prefixedColumnsMatch.NextMatch();
+            prefixedColumnsMatch = prefixedColumnsMatch.NextMatch();
             var secondPrefixedColumn = GetPrefixedColumnFromString(prefixedColumnsMatch.Value);
             
-            parsedCommand = new JoinCommand(tableName, tableToJoin, firstPrefixedColumn.ColumnName, secondPrefixedColumn.ColumnName, columns, joinType.Equals("loop") ? JoinType.IndexNestedLoopJoin : JoinType.HashJoin);
+            parsedCommand = new JoinCommand(tableName, tableToJoin, firstPrefixedColumn.ColumnName, secondPrefixedColumn.ColumnName, null, joinType.Equals("loop") ? JoinType.IndexNestedLoopJoin : JoinType.HashJoin);
             return true;
         }
 

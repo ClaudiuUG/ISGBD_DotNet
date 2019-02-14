@@ -118,7 +118,7 @@ namespace KeyValueDatabaseApi.Context
             ThrowIfPrimaryKeyIsNull(primaryKey);
 
 
-            CheckForeignKeyContraints(tableName, key);
+            CheckForeignKeyConstraints(tableName, key);
 
             DeleteRowFromIndices(tableName, key);
             _dbAgent.DeleteFromStorage(tablePath, key);
@@ -132,7 +132,8 @@ namespace KeyValueDatabaseApi.Context
             var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
             return string.Join(" ", resultTableRows);
 
-            // return GroupByHavingSum("note", "nota", 7, ">");
+            //return GroupByHavingCount("studenti", "varsta", 2, "<");
+            //return GroupByHavingSum("note", "nota", 7, ">");
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -222,13 +223,38 @@ namespace KeyValueDatabaseApi.Context
             return string.Join("    ", result);
         }
 
-        public string GroupBy(string tableName, string groupByColumn)
+        public string GroupByCount(string tableName, string groupByColumn)
         {
             ThrowIfNoDatabaseInUse();
             var table = GetTableFromCurrentDatabase(tableName);
             ThrowIfTableMetadataIsNull(table, tableName);
 
-            return string.Join("    ", SelectGroupByForGivenColumn(table, groupByColumn));
+            var result = new List<string>();
+            var groupBy = SelectGroupByForGivenColumn(table, groupByColumn);
+
+            foreach(var group in groupBy)
+            {
+                result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
+            }
+
+            return string.Join("    ", result);
+        }
+
+        public string GroupBySum(string tableName, string groupByColumn)
+        {
+            ThrowIfNoDatabaseInUse();
+            var table = GetTableFromCurrentDatabase(tableName);
+            ThrowIfTableMetadataIsNull(table, tableName);
+
+            var result = new List<string>();
+            var groupBy = SelectGroupByForGivenColumn(table, groupByColumn);
+
+            foreach (var group in groupBy)
+            {
+                result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, GetColumnIndex(table,  groupByColumn)));
+            }
+
+            return string.Join("    ", result);
         }
 
         public string GroupByHavingCount(string tableName, string groupByColumn, int value, string comparer)
@@ -238,7 +264,6 @@ namespace KeyValueDatabaseApi.Context
             ThrowIfTableMetadataIsNull(table, tableName);
 
             var result = new List<string>();
-
             var groupBy = SelectGroupByForGivenColumn(table, groupByColumn);
 
             foreach(var group in groupBy)
@@ -246,27 +271,27 @@ namespace KeyValueDatabaseApi.Context
                 if (comparer.Equals(">"))
                 {
                     if (Count(group) > value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
                 }
                 else if (comparer.Equals("<"))
                 {
                     if (Count(group) < value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
                 }
                 else if (comparer.Equals(">="))
                 {
                     if (Count(group) >= value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
                 }
                 else if (comparer.Equals("<="))
                 {
                     if (Count(group) <= value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
                 }
                 else if (comparer.Equals("="))
                 {
                     if (Count(group) == value)
-                        result.Add(group);
+                        result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
                 }
             }
 
@@ -439,8 +464,6 @@ namespace KeyValueDatabaseApi.Context
 
         private void UpdateForeignKeys(TableMetadataEntry tableMetadata, List<string> values, List<string> columnNames)
         {
-            // Don't quite get this one.
-
             foreach (var entry in tableMetadata.ForeignKeys)
             {
                 var key = string.Empty;
@@ -469,7 +492,7 @@ namespace KeyValueDatabaseApi.Context
             }
         }
 
-        private void CheckForeignKeyContraints(string tableName, string key)
+        private void CheckForeignKeyConstraints(string tableName, string key)
         {
             foreach (var table in _currentDatabase.Tables)
             {
@@ -845,10 +868,11 @@ namespace KeyValueDatabaseApi.Context
 
             foreach (var value in values)
             {
-                if (!string.IsNullOrEmpty(value.Trim()))
+                string newValue = value.Trim();
+                if (!string.IsNullOrEmpty(newValue))
                 {
-                    var columns = value.Split(' ');
-                    sum +=Int32.Parse(columns[columnIndex+1]);
+                    var columns = newValue.Split(' ');
+                    sum +=Int32.Parse(columns[columnIndex]);
                 }
             }
 

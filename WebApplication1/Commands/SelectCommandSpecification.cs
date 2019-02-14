@@ -7,12 +7,14 @@ namespace KeyValueDatabaseApi.Commands
 {
     public class SelectCommandSpecification : ICommandSpecification
     {
+        // select * from tableName where id = 1
+        // group by columnone having count|sum = 4
         private readonly string _selectRegex = "^" +
             RegexStrings.SelectReservedWordRegex +
             RegexStrings.SelectSubject +
             RegexStrings.FromReservedWordRegex +
-            RegexStrings.IdentifierRegex +
-            "$";
+            RegexStrings.IdentifierRegex;
+
         private readonly string _selectWhereRegex =
             "^" +
             RegexStrings.SelectReservedWordRegex +
@@ -22,8 +24,7 @@ namespace KeyValueDatabaseApi.Commands
             RegexStrings.WhereReservedWordRegex +
             RegexStrings.IdentifierRegex +
             RegexStrings.EqualOperatorRegex +
-            RegexStrings.RowEntryValueWithSpaces +
-            "$";
+            RegexStrings.RowEntryValueWithSpaces;
 
         private readonly string _groupByRegex =
             RegexStrings.GroupByReservedWordsRegex +
@@ -62,13 +63,23 @@ namespace KeyValueDatabaseApi.Commands
                 var indexOfEqual = command.IndexOf(RegexStrings.EqualOperator, StringComparison.Ordinal);
                 var commandFromEquals = command.Remove(0, indexOfEqual);
                 var keyToFind = Regex.Match(commandFromEquals, RegexStrings.RowEntryValue).Value;
-                parsedCommand = new SelectCommand(tableName, columnName, keyToFind);
-                return true;
+                if (!hasGroupBy)
+                {
+                    parsedCommand = new SelectCommand(tableName, columnName, keyToFind);
+                    return true;
+                }
             }
 
             if (hasGroupBy)
             {
-                throw new NotImplementedException();
+                var groupByCondition = groupByMatch.Value;
+                groupByCondition = groupByCondition.Remove(0, "group by".Length + 2);
+                var groupByColumn = groupByCondition.TrimStart();
+                parsedCommand = new SelectCommand(tableName)
+                {
+                    GroupByColumn = groupByColumn
+                };
+                return true;
             }
 
             parsedCommand = new SelectCommand(tableName);

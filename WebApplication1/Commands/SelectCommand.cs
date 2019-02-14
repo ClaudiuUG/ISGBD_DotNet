@@ -31,11 +31,16 @@ namespace KeyValueDatabaseApi.Commands
         public bool ShouldSelectAll { get; set; }
         public string KeyColumn { get; set; }
         public string KeyValue { get; set; }
+        public string GroupByColumn { get; set; }
 
         public string Execute()
         {
             var dbContext = DbContext.GetDbContext();
-            return dbContext.SelectFromTable(TableName, ColumnList, KeyColumn, KeyValue);
+            if (string.IsNullOrEmpty(GroupByColumn))
+            {
+                return dbContext.SelectFromTable(TableName, ColumnList, KeyColumn, KeyValue);
+            }
+            return dbContext.GroupByCount(TableName, GroupByColumn);
         }
     }
 }
