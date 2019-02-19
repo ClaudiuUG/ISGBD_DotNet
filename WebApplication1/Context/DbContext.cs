@@ -81,13 +81,6 @@ namespace KeyValueDatabaseApi.Context
             var primaryKey = tableMetadata.PrimaryKey.PrimaryKeyAttribute;
             ThrowIfPrimaryKeyIsNull(primaryKey);
 
-            // TODO: check the eventual foreign key constraints
-            // get the foreign keys
-            // check that the value from the referenced table columns exist in the parent table for each foreign key
-            // how ? indexes - each index should have a b+ tree kept consistent upon insertion
-            // beside this, need to update index creation and search using indexes, no other way
-            // if the foreign key constraints are not fulfilled, throw an error with a message
-
             var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, tableName);
             var keyValueToInsert = CreateKeyValueForData(columnNames, values, primaryKey);
 
@@ -130,10 +123,10 @@ namespace KeyValueDatabaseApi.Context
         {
             ThrowIfNoDatabaseInUse();
             var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
-            //return string.Join(" ", resultTableRows);
+            return string.Join(" ", resultTableRows);
 
             //return GroupByHavingCount("studenti", "varsta", 2, "<");
-            return GroupByHavingSum("note", "nota", 7, ">");
+            //return GroupByHavingSum("note", "nota", 7, ">");
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -146,11 +139,6 @@ namespace KeyValueDatabaseApi.Context
             ThrowIfIndexAlreadyExists(indexPath, tableName);
 
             ThrowIfIndexingColumnsDoNotExist(table, columnNames);
-
-            // BUILD INDEX
-            // multiple inserts into storage for index path
-            // key = valoarea coloanelor
-            // valoare = restul campurilor concatenate
 
             table.IndexFiles.Add(new IndexFileEntry(indexName, columnNames));
             SaveMetadataToFile();
@@ -232,7 +220,7 @@ namespace KeyValueDatabaseApi.Context
             var result = new List<string>();
             var groupBy = SelectGroupByForGivenColumn(table, groupByColumn);
 
-            foreach(var group in groupBy)
+            foreach (var group in groupBy)
             {
                 result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
             }
@@ -251,7 +239,7 @@ namespace KeyValueDatabaseApi.Context
 
             foreach (var group in groupBy)
             {
-                result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, GetColumnIndex(table,  groupByColumn)));
+                result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, GetColumnIndex(table, groupByColumn)));
             }
 
             return string.Join("    ", result);
@@ -266,32 +254,42 @@ namespace KeyValueDatabaseApi.Context
             var result = new List<string>();
             var groupBy = SelectGroupByForGivenColumn(table, groupByColumn);
 
-            foreach(var group in groupBy)
+            foreach (var group in groupBy)
             {
                 if (comparer.Equals(">"))
                 {
                     if (Count(group) > value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
+                    }
                 }
                 else if (comparer.Equals("<"))
                 {
                     if (Count(group) < value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
+                    }
                 }
                 else if (comparer.Equals(">="))
                 {
                     if (Count(group) >= value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
+                    }
                 }
                 else if (comparer.Equals("<="))
                 {
                     if (Count(group) <= value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
+                    }
                 }
                 else if (comparer.Equals("="))
                 {
                     if (Count(group) == value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Count(group));
+                    }
                 }
             }
 
@@ -315,27 +313,37 @@ namespace KeyValueDatabaseApi.Context
                 if (comparer.Equals(">"))
                 {
                     if (Sum(group, index) > value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
+                    }
                 }
                 else if (comparer.Equals("<"))
                 {
                     if (Sum(group, index) < value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
+                    }
                 }
                 else if (comparer.Equals(">="))
                 {
                     if (Sum(group, index) >= value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
+                    }
                 }
                 else if (comparer.Equals("<="))
                 {
                     if (Sum(group, index) <= value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
+                    }
                 }
                 else if (comparer.Equals("="))
                 {
                     if (Sum(group, index) == value)
+                    {
                         result.Add(group.Split(':').FirstOrDefault() + " " + Sum(group, index));
+                    }
                 }
             }
 
@@ -416,7 +424,14 @@ namespace KeyValueDatabaseApi.Context
                 {
                     key += "#" + values[i];
                 }
-                valuesString += "#" + values[i];
+                if (string.Equals(values[i], "0"))
+                {
+                    valuesString += "#" + "null";
+                }
+                else
+                {
+                    valuesString += "#" + values[i];
+                }
             }
 
             return new KeyValuePair<string, string>(key, valuesString);
@@ -623,7 +638,6 @@ namespace KeyValueDatabaseApi.Context
 
         private List<string> FormatResultRow(string row, List<string> columnNames, TableMetadataEntry tableMetadata)
         {
-            var count = Count(row);
             var result = new List<string>();
             var rows = row.Split('|');
             foreach (string newRow in rows)
@@ -738,6 +752,82 @@ namespace KeyValueDatabaseApi.Context
             return result;
         }
 
+        private List<string> SelectFromLeftOuterJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        {
+            List<string> result = new List<string>();
+
+            foreach (var foreignKey in table2.ForeignKeys)
+            {
+                if (foreignKey.Columns.Contains(joinColumn2))
+                {
+                    var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table1.TableName);
+                    var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table2.TableName, table1.TableName);
+                    var table1Data = _dbAgent.GetAllFromStorage(tablePath);
+
+                    foreach (var entry in table1Data)
+                    {
+                        var key = entry.Key;
+                        var value = _dbAgent.GetFromStorage(indexPath, key);
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            if (!value.Contains('|'))
+                            {
+                                result.Add(string.Join(" ", FormatResultRow(entry.Value + value, columnNames, table1)));
+                            }
+                            else
+                            {
+                                var values = value.Split('|');
+                                foreach (var newValue in values)
+                                {
+                                    result.Add(string.Join(" ", FormatResultRow(entry.Value + newValue, columnNames, table1)));
+                                }
+                            }
+                        }
+                        else
+                        {
+                            result.Add(string.Join(" ", FormatResultRow(entry.Value + FillRowWithNull(table2), columnNames, table1)));
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private List<string> SelectFromRightOuterJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        {
+            List<string> result = new List<string>();
+
+            foreach (var foreignKey in table2.ForeignKeys)
+            {
+                if (foreignKey.Columns.Contains(joinColumn2))
+                {
+                    var table1Path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table1.TableName);
+                    var table2Path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table2.TableName);
+                    var indexPath = PathHelper.GetIndexPath(_currentDatabase.DatabaseName, table2.TableName, table1.TableName);
+                    var table1Data = _dbAgent.GetAllFromStorage(table1Path);
+                    var table2Data = _dbAgent.GetAllFromStorage(table2Path);
+
+                    foreach (var entry in table2Data)
+                    {
+                        var key = entry.Key;
+                        var foreignKeyColumn = "#" + entry.Value.Remove(0, 1).Split('#').ElementAt(GetColumnIndex(table2, joinColumn2));
+                        var value = _dbAgent.GetFromStorage(indexPath, foreignKeyColumn);
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                                result.Add(string.Join(" ", FormatResultRow(_dbAgent.GetFromStorage(table1Path, foreignKeyColumn) + entry.Value, columnNames, table1)));
+                        }
+                        else
+                        {
+                            result.Add(string.Join(" ", FormatResultRow(FillRowWithNull(table1) + entry.Value, columnNames, table1)));
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
         private List<string> SelectGroupBy(TableMetadataEntry table, string path)
         {
             List<KeyValuePair<string, string>> resultList = _dbAgent.GetAllFromStorage(path);
@@ -785,10 +875,10 @@ namespace KeyValueDatabaseApi.Context
             var dictionary = GetHashTableForGivenColumn(table, groupByColumn);
             List<string> result = new List<string>();
 
-            foreach(var row in dictionary)
+            foreach (var row in dictionary)
             {
                 string values = string.Empty;
-                foreach(var value in row.Value)
+                foreach (var value in row.Value)
                 {
                     values += value + '|';
                 }
@@ -820,7 +910,7 @@ namespace KeyValueDatabaseApi.Context
             var rows = _dbAgent.GetAllFromStorage(tablePath);
             var index = -1;
 
-            foreach(var column in table.Structure)
+            foreach (var column in table.Structure)
             {
                 if (column.AttributeName.Equals(columnName))
                 {
@@ -829,12 +919,14 @@ namespace KeyValueDatabaseApi.Context
             }
 
             if (index == -1)
+            {
                 throw new Exception("Column does not exist");
+            }
 
             foreach (var row in rows)
             {
                 var values = row.Value.Split('#');
-                if(hashTable.ContainsKey(values[index + 1]))
+                if (hashTable.ContainsKey(values[index + 1]))
                 {
                     hashTable[values[index + 1]].Add(row.Value);
                 }
@@ -852,10 +944,12 @@ namespace KeyValueDatabaseApi.Context
             int count = 0;
             var values = row.Split(':').LastOrDefault().Split('|');
 
-            foreach(var value in values)
+            foreach (var value in values)
             {
                 if (!string.IsNullOrEmpty(value.Trim()))
+                {
                     count++;
+                }
             }
 
             return count;
@@ -872,7 +966,7 @@ namespace KeyValueDatabaseApi.Context
                 if (!string.IsNullOrEmpty(newValue))
                 {
                     var columns = newValue.Split(' ');
-                    sum +=Int32.Parse(columns[columnIndex]);
+                    sum += Int32.Parse(columns[columnIndex]);
                 }
             }
 
@@ -891,6 +985,18 @@ namespace KeyValueDatabaseApi.Context
             }
 
             return index;
+        }
+
+        private string FillRowWithNull(TableMetadataEntry table)
+        {
+            string row = string.Empty;
+
+            foreach (var column in table.Structure)
+            {
+                row += " null ";
+            }
+
+            return row;
         }
         #endregion
 
@@ -949,13 +1055,16 @@ namespace KeyValueDatabaseApi.Context
             {
                 for (var i = 0; i < values.Count; i++)
                 {
-                    if (entry.Columns.FirstOrDefault().Equals(columnNames[i]))
+                    if (values[i] != "0")
                     {
-                        if (SelectRowFromTable(entry.ReferencedTableName, null, columnNames[i], values[i], true).Count == 0)
+                        if (entry.Columns.FirstOrDefault().Equals(columnNames[i]))
                         {
-                            // This is called after everything else is inserted, throwing here would leave the database in a bad state
-                            // Since this is part of the row add and it checks constraints, it should be called the first.
-                            throw new Exception("Key does not exist");
+                            if (SelectRowFromTable(entry.ReferencedTableName, null, columnNames[i], values[i], true).Count == 0)
+                            {
+                                // This is called after everything else is inserted, throwing here would leave the database in a bad state
+                                // Since this is part of the row add and it checks constraints, it should be called the first.
+                                throw new Exception("Key does not exist");
+                            }
                         }
                     }
                 }
@@ -1017,10 +1126,10 @@ namespace KeyValueDatabaseApi.Context
 
         private void ThrowIfColumnIsNotInt(TableMetadataEntry tableMetadata, string columnName)
         {
-                if(!tableMetadata.Structure[GetColumnIndex(tableMetadata, columnName)].Type.Equals("int"))
-                {
-                    throw new Exception("Only int can be summed");
-                }
+            if (!tableMetadata.Structure[GetColumnIndex(tableMetadata, columnName)].Type.Equals("int"))
+            {
+                throw new Exception("Only int can be summed");
+            }
         }
 
         #endregion
