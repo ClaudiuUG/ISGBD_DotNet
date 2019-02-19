@@ -752,7 +752,7 @@ namespace KeyValueDatabaseApi.Context
             return result;
         }
 
-        private List<string> SelectFromLeftOuterJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        public List<string> SelectFromLeftOuterJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
         {
             List<string> result = new List<string>();
 
@@ -794,7 +794,7 @@ namespace KeyValueDatabaseApi.Context
             return result;
         }
 
-        private List<string> SelectFromRightOuterJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        public List<string> SelectFromRightOuterJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
         {
             List<string> result = new List<string>();
 
