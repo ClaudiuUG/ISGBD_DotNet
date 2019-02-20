@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Text.RegularExpressions;
 using KeyValueDatabaseApi.Matchers;
 
@@ -33,6 +32,26 @@ namespace KeyValueDatabaseApi.Commands
 
         public bool TryParse(string command, out ICommand parsedCommand)
         {
+            var containsHaving = Regex.Match(command, "having").Success;
+            AggregatorFunction? aggregatorFunction = null;
+            var groupByHavingComparer = string.Empty;
+            int? groupByHavingValue = null;
+            if (containsHaving)
+            {
+                if (Regex.Match(command, "count").Success)
+                {
+                    aggregatorFunction = AggregatorFunction.Count;
+                }
+                if (Regex.Match(command, "sum").Success)
+                {
+                    aggregatorFunction = AggregatorFunction.Sum;
+                }
+
+                var havingMatch = Regex.Match(command, "(<|<=|=|>=|>)\\s+([0-9]+)");
+                groupByHavingComparer = havingMatch.Groups[1].Value;
+                groupByHavingValue = int.Parse(havingMatch.Groups[2].Value);
+            }
+
             var groupByMatch = Regex.Match(command, _groupByRegex);
             var hasGroupBy = groupByMatch.Success;
 
@@ -75,11 +94,20 @@ namespace KeyValueDatabaseApi.Commands
                 var groupByCondition = groupByMatch.Value;
                 groupByCondition = groupByCondition.Remove(0, "group by".Length + 2);
                 var groupByColumn = groupByCondition.TrimStart();
-                parsedCommand = new SelectCommand(tableName)
+                if (containsHaving)
                 {
-                    GroupByColumn = groupByColumn
-                };
-                return true;
+                    parsedCommand = new SelectCommand(tableName, groupByColumn, groupByHavingValue,
+                        groupByHavingComparer, aggregatorFunction.Value);
+                    return true;
+                }
+                else
+                {
+                    parsedCommand = new SelectCommand(tableName)
+                    {
+                        GroupByColumn = groupByColumn
+                    };
+                    return true;
+                }
             }
 
             parsedCommand = new SelectCommand(tableName);
