@@ -779,9 +779,12 @@ namespace KeyValueDatabaseApi.Context
             return result;
         }
 
-        public List<string> SelectFromLeftOuterJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        public List<string> SelectFromLeftOuterJoinedTables(string firstTable, string secondTable, string joinColumn1, string joinColumn2, List<string> columnNames)
         {
-            List<string> result = new List<string>();
+            var table1 = GetTableFromCurrentDatabase(firstTable);
+            var table2 = GetTableFromCurrentDatabase(secondTable);
+
+            var result = new List<string>();
 
             foreach (var foreignKey in table2.ForeignKeys)
             {
@@ -821,9 +824,12 @@ namespace KeyValueDatabaseApi.Context
             return result;
         }
 
-        public List<string> SelectFromRightOuterJoinedTables(TableMetadataEntry table1, TableMetadataEntry table2, string joinColumn1, string joinColumn2, List<string> columnNames)
+        public List<string> SelectFromRightOuterJoinedTables(string firstTable, string secondTable, string joinColumn1, string joinColumn2, List<string> columnNames)
         {
-            List<string> result = new List<string>();
+            var table1 = GetTableFromCurrentDatabase(firstTable);
+            var table2 = GetTableFromCurrentDatabase(secondTable);
+
+            var result = new List<string>();
 
             foreach (var foreignKey in table2.ForeignKeys)
             {
