@@ -123,10 +123,13 @@ namespace KeyValueDatabaseApi.Context
         {
             ThrowIfNoDatabaseInUse();
             var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
-            return string.Join(" ", resultTableRows);
+            //return string.Join(" ", resultTableRows);
 
             //return GroupByHavingCount("studenti", "varsta", 2, "<");
             //return GroupByHavingSum("note", "nota", 7, ">");
+            //return SelectUnion("studenti", "note");
+            //return SelectIntersect("studenti", "note");
+            return SelectOrderBy("note", "nota");
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -349,6 +352,30 @@ namespace KeyValueDatabaseApi.Context
 
             return string.Join("    ", result);
         }
+
+        public string SelectUnion(string table1Name, string table2Name)
+        {
+            ThrowIfNoDatabaseInUse();
+            var resultTableRows = SelectFromUnionTables(table1Name, table2Name);
+            return string.Join(" ", resultTableRows);
+        }
+
+        public string SelectIntersect(string table1Name, string table2Name)
+        {
+            ThrowIfNoDatabaseInUse();
+            var resultTableRows = SelectFromIntersectTables(table1Name, table2Name);
+            return string.Join(" ", resultTableRows);
+        }
+
+        public string SelectOrderBy(string tableName, string columnBy)
+        {
+            ThrowIfNoDatabaseInUse();
+            var table = GetTableFromCurrentDatabase(tableName);
+            ThrowIfTableMetadataIsNull(table, tableName);
+
+            return string.Join("    ", SelectWithOrderBy(table, columnBy));
+        }
+
         #endregion
 
         #region Helpers
@@ -815,7 +842,7 @@ namespace KeyValueDatabaseApi.Context
                         var value = _dbAgent.GetFromStorage(indexPath, foreignKeyColumn);
                         if (!string.IsNullOrEmpty(value))
                         {
-                                result.Add(string.Join(" ", FormatResultRow(_dbAgent.GetFromStorage(table1Path, foreignKeyColumn) + entry.Value, columnNames, table1)));
+                            result.Add(string.Join(" ", FormatResultRow(_dbAgent.GetFromStorage(table1Path, foreignKeyColumn) + entry.Value, columnNames, table1)));
                         }
                         else
                         {
@@ -884,6 +911,71 @@ namespace KeyValueDatabaseApi.Context
                 }
 
                 result.Add(row.Key + " : " + string.Join(" ", FormatResultRow(values, null, table)));
+            }
+
+            return result;
+        }
+
+        private List<string> SelectFromUnionTables(string table1Name, string table2Name)
+        {
+            var table1Path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table1Name);
+            var table2Path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table2Name);
+            List<KeyValuePair<string, string>> resultList1 = _dbAgent.GetAllFromStorage(table1Path);
+            List<KeyValuePair<string, string>> resultList2 = _dbAgent.GetAllFromStorage(table2Path);
+            List<string> result = new List<string>();
+
+            for (int i = 0; i < resultList1.Count; i++)
+            {
+                result.Add(resultList1[i].Key);
+                result.Add(" | ");
+            }
+
+            for (int i = 0; i < resultList2.Count; i++)
+            {
+                result.Add(resultList2[i].Key);
+                result.Add(" | ");
+            }
+
+            return result;
+        }
+
+        private List<string> SelectFromIntersectTables(string table1Name, string table2Name)
+        {
+            var table1Path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table1Name);
+            var table2Path = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table2Name);
+            List<KeyValuePair<string, string>> resultList1 = _dbAgent.GetAllFromStorage(table1Path);
+            List<KeyValuePair<string, string>> resultList2 = _dbAgent.GetAllFromStorage(table2Path);
+            List<string> result = new List<string>();
+
+            for (int i = 0; i < resultList1.Count; i++)
+            {
+                for (int j = 0; j < resultList2.Count; j++)
+                {
+                    if (resultList1[i].Key.Equals(resultList2[j].Key))
+                    {
+                        result.Add(resultList1[i].Key);
+                        result.Add(" | ");
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private List<string> SelectWithOrderBy(TableMetadataEntry table, string columnName)
+        {
+            var tablePath = PathHelper.GetTablePath(_currentDatabase.DatabaseName, table.TableName);
+            int columnIndex = GetColumnIndex(table, columnName);
+
+            Split(tablePath);
+            SortTheChunks(columnIndex);
+            MergeTheChunks();
+
+            List<string> result = new List<string>();
+            foreach(var line in File.ReadAllLines(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\BigFileSorted.txt").ToList())
+            {
+                result.Add(line);
+                result.Add(" | ");
             }
 
             return result;
@@ -997,6 +1089,154 @@ namespace KeyValueDatabaseApi.Context
             }
 
             return row;
+        }
+
+        private void Split(string file)
+        {
+            int split_num = 1;
+            StreamWriter sw = new StreamWriter(
+              string.Format(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\split{0:d5}.dat", split_num));
+            long read_line = 0;
+            using (StreamReader sr = new StreamReader(file))
+            {
+                while (sr.Peek() >= 0)
+                {
+                    // Progress reporting
+                    if (++read_line % 5000 == 0)
+                    {
+                        Console.Write("{0:f2}%   \r",
+                              100.0 * sr.BaseStream.Position / sr.BaseStream.Length);
+                    }
+
+                    // Copy a line
+                    sw.WriteLine(sr.ReadLine());
+
+                    // If the file is big, then make a new split,
+                    // however if this was the last line then don't bother
+                    if (sw.BaseStream.Length > 100000000 && sr.Peek() >= 0)
+                    {
+                        sw.Close();
+                        split_num++;
+                        sw = new StreamWriter(
+                          string.Format(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\split{0:d5}.dat", split_num));
+                    }
+                }
+            }
+            sw.Close();
+        }
+
+        private void SortTheChunks(int columnIndex)
+        {
+            foreach (string path in Directory.GetFiles(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\", "split*.dat"))
+            {
+                // Read all lines into an array
+                List<string> contents = File.ReadAllLines(path).ToList();
+                // Sort the in-memory array
+                contents = contents.OrderBy(s => s.Split(new string[] { "#" }, StringSplitOptions.RemoveEmptyEntries)[columnIndex]).ToList();
+                // Create the 'sorted' filename
+                string newpath = path.Replace("split", "sorted");
+                // Write it
+                File.WriteAllLines(newpath, contents);
+                // Delete the unsorted chunk
+                File.Delete(path);
+                // Free the in-memory sorted array
+                contents = null;
+                GC.Collect();
+            }
+        }
+
+        private void MergeTheChunks()
+        {
+            string[] paths = Directory.GetFiles(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\", "sorted*.dat");
+            int chunks = paths.Length; // Number of chunks
+            int recordsize = 100; // estimated record size
+            int records = 10000000; // estimated total # records
+            int maxusage = 500000000; // max memory usage
+            int buffersize = maxusage / chunks; // bytes of each queue
+            double recordoverhead = 7.5; // The overhead of using Queue<>
+            int bufferlen = (int)(buffersize / recordsize /
+              recordoverhead); // number of records in each queue
+
+            // Open the files
+            StreamReader[] readers = new StreamReader[chunks];
+            for (int i = 0; i < chunks; i++)
+                readers[i] = new StreamReader(paths[i]);
+
+            // Make the queues
+            Queue<string>[] queues = new Queue<string>[chunks];
+            for (int i = 0; i < chunks; i++)
+                queues[i] = new Queue<string>(bufferlen);
+
+            // Load the queues
+            for (int i = 0; i < chunks; i++)
+                LoadQueue(queues[i], readers[i], bufferlen);
+
+            // Merge!
+            StreamWriter sw = new StreamWriter(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\BigFileSorted.txt");
+            bool done = false;
+            int lowest_index, j, progress = 0;
+            string lowest_value;
+            while (!done)
+            {
+                // Report the progress
+                if (++progress % 5000 == 0)
+                    Console.Write("{0:f2}%   \r",
+                      100.0 * progress / records);
+
+                // Find the chunk with the lowest value
+                lowest_index = -1;
+                lowest_value = "";
+                for (j = 0; j < chunks; j++)
+                {
+                    if (queues[j] != null)
+                    {
+                        if (lowest_index < 0 ||
+                          String.CompareOrdinal(
+                            queues[j].Peek(), lowest_value) < 0)
+                        {
+                            lowest_index = j;
+                            lowest_value = queues[j].Peek();
+                        }
+                    }
+                }
+
+                // Was nothing found in any queue? We must be done then.
+                if (lowest_index == -1) { done = true; break; }
+
+                // Output it
+                sw.WriteLine(lowest_value);
+
+                // Remove from queue
+                queues[lowest_index].Dequeue();
+                // Have we emptied the queue? Top it up
+                if (queues[lowest_index].Count == 0)
+                {
+                    LoadQueue(queues[lowest_index],
+                      readers[lowest_index], bufferlen);
+                    // Was there nothing left to read?
+                    if (queues[lowest_index].Count == 0)
+                    {
+                        queues[lowest_index] = null;
+                    }
+                }
+            }
+            sw.Close();
+
+            // Close and delete the files
+            for (int i = 0; i < chunks; i++)
+            {
+                readers[i].Close();
+                File.Delete(paths[i]);
+            }
+        }
+
+        private void LoadQueue(Queue<string> queue, StreamReader file, int records)
+        {
+            for (int i = 0; i < records; i++)
+            {
+                if (file.Peek() < 0) break;
+                queue.Enqueue(file.ReadLine());
+            }
         }
         #endregion
 
