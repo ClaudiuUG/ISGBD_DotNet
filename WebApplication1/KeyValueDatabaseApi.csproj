@@ -197,6 +197,8 @@
     <Compile Include="Context\IDbAgent.cs" />
     <Compile Include="Context\MetadataEntries.cs" />
     <Compile Include="Context\PathHelper.cs" />
+    <Compile Include="Commands\SelectOrderByCommand.cs" />
+    <Compile Include="Commands\SelectOrderByCommandSpecification.cs" />
     <Compile Include="Controllers\KeyValueDatabaseHttpController.cs" />
     <Compile Include="Exceptions\KeyCouldNotBeDeletedException.cs" />
     <Compile Include="Exceptions\CouldNotFindKeyException.cs" />
