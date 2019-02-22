@@ -129,7 +129,7 @@ namespace KeyValueDatabaseApi.Context
             //return GroupByHavingSum("note", "nota", 7, ">");
             //return SelectUnion("studenti", "note");
             //return SelectIntersect("studenti", "note");
-            return SelectOrderBy("note", "nota");
+            return SelectOrderBy("studenti", "nume");
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -975,15 +975,9 @@ namespace KeyValueDatabaseApi.Context
 
             Split(tablePath);
             SortTheChunks(columnIndex);
-            MergeTheChunks();
+            MergeTheChunks(columnIndex);
 
-            List<string> result = new List<string>();
-            foreach(var line in File.ReadAllLines(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\BigFileSorted.txt").ToList())
-            {
-                result.Add(line);
-                result.Add(" | ");
-            }
-
+            List<string> result = File.ReadAllLines(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\BigFileSorted").ToList();
             return result;
         }
 
@@ -1101,31 +1095,18 @@ namespace KeyValueDatabaseApi.Context
         {
             int split_num = 1;
             StreamWriter sw = new StreamWriter(
-              string.Format(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\split{0:d5}.dat", split_num));
-            long read_line = 0;
-            using (StreamReader sr = new StreamReader(file))
+               string.Format(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\split{0:d5}", split_num));
+
+            foreach (var pair in _dbAgent.GetAllFromStorage(file))
             {
-                while (sr.Peek() >= 0)
+                sw.WriteLine(pair.Value);
+
+                if (sw.BaseStream.Length > 1000)
                 {
-                    // Progress reporting
-                    if (++read_line % 5000 == 0)
-                    {
-                        Console.Write("{0:f2}%   \r",
-                              100.0 * sr.BaseStream.Position / sr.BaseStream.Length);
-                    }
-
-                    // Copy a line
-                    sw.WriteLine(sr.ReadLine());
-
-                    // If the file is big, then make a new split,
-                    // however if this was the last line then don't bother
-                    if (sw.BaseStream.Length > 100000000 && sr.Peek() >= 0)
-                    {
-                        sw.Close();
-                        split_num++;
-                        sw = new StreamWriter(
-                          string.Format(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\split{0:d5}.dat", split_num));
-                    }
+                    sw.Close();
+                    split_num++;
+                    sw = new StreamWriter(
+                      string.Format(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\split{0:d5}", split_num));
                 }
             }
             sw.Close();
@@ -1133,7 +1114,7 @@ namespace KeyValueDatabaseApi.Context
 
         private void SortTheChunks(int columnIndex)
         {
-            foreach (string path in Directory.GetFiles(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\", "split*.dat"))
+            foreach (string path in Directory.GetFiles(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\", "split*"))
             {
                 // Read all lines into an array
                 List<string> contents = File.ReadAllLines(path).ToList();
@@ -1142,7 +1123,7 @@ namespace KeyValueDatabaseApi.Context
                 // Create the 'sorted' filename
                 string newpath = path.Replace("split", "sorted");
                 // Write it
-                File.WriteAllLines(newpath, contents);
+                File.WriteAllLines(newpath, contents.ToArray());
                 // Delete the unsorted chunk
                 File.Delete(path);
                 // Free the in-memory sorted array
@@ -1151,98 +1132,71 @@ namespace KeyValueDatabaseApi.Context
             }
         }
 
-        private void MergeTheChunks()
+        private void MergeTheChunks(int columnIndex)
         {
-            string[] paths = Directory.GetFiles(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\", "sorted*.dat");
-            int chunks = paths.Length; // Number of chunks
-            int recordsize = 100; // estimated record size
-            int records = 10000000; // estimated total # records
-            int maxusage = 500000000; // max memory usage
-            int buffersize = maxusage / chunks; // bytes of each queue
-            double recordoverhead = 7.5; // The overhead of using Queue<>
-            int bufferlen = (int)(buffersize / recordsize /
-              recordoverhead); // number of records in each queue
+            string[] paths = Directory.GetFiles(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\", "sorted*");
+            string finalPath = @"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\BigFileSorted";
+            var resultLists = new List<List<string>>();
 
-            // Open the files
-            StreamReader[] readers = new StreamReader[chunks];
-            for (int i = 0; i < chunks; i++)
-                readers[i] = new StreamReader(paths[i]);
-
-            // Make the queues
-            Queue<string>[] queues = new Queue<string>[chunks];
-            for (int i = 0; i < chunks; i++)
-                queues[i] = new Queue<string>(bufferlen);
-
-            // Load the queues
-            for (int i = 0; i < chunks; i++)
-                LoadQueue(queues[i], readers[i], bufferlen);
-
-            // Merge!
-            StreamWriter sw = new StreamWriter(@"C:\Users\Cristiana\Source\Repos\ISGBD_DotNet\WebApplication1\chunks\BigFileSorted.txt");
-            bool done = false;
-            int lowest_index, j, progress = 0;
-            string lowest_value;
-            while (!done)
+            foreach (var path in paths)
             {
-                // Report the progress
-                if (++progress % 5000 == 0)
-                    Console.Write("{0:f2}%   \r",
-                      100.0 * progress / records);
+                resultLists.Add(File.ReadAllLines(path).ToList());
+            }
 
-                // Find the chunk with the lowest value
-                lowest_index = -1;
-                lowest_value = "";
-                for (j = 0; j < chunks; j++)
+            if (paths.Length > 1)
+            {
+                int i = paths.Length;
+                while (i > 1)
                 {
-                    if (queues[j] != null)
-                    {
-                        if (lowest_index < 0 ||
-                          String.CompareOrdinal(
-                            queues[j].Peek(), lowest_value) < 0)
-                        {
-                            lowest_index = j;
-                            lowest_value = queues[j].Peek();
-                        }
-                    }
-                }
-
-                // Was nothing found in any queue? We must be done then.
-                if (lowest_index == -1) { done = true; break; }
-
-                // Output it
-                sw.WriteLine(lowest_value);
-
-                // Remove from queue
-                queues[lowest_index].Dequeue();
-                // Have we emptied the queue? Top it up
-                if (queues[lowest_index].Count == 0)
-                {
-                    LoadQueue(queues[lowest_index],
-                      readers[lowest_index], bufferlen);
-                    // Was there nothing left to read?
-                    if (queues[lowest_index].Count == 0)
-                    {
-                        queues[lowest_index] = null;
-                    }
+                    resultLists.Add(MergeTwoChunks(resultLists[0], resultLists[1], columnIndex));
+                    resultLists.Remove(resultLists[0]);
+                    resultLists.Remove(resultLists[0]);
+                    i--;
                 }
             }
-            sw.Close();
 
-            // Close and delete the files
-            for (int i = 0; i < chunks; i++)
-            {
-                readers[i].Close();
-                File.Delete(paths[i]);
-            }
+            File.WriteAllLines(finalPath, resultLists[0].ToArray());
         }
 
-        private void LoadQueue(Queue<string> queue, StreamReader file, int records)
+        private List<string> MergeTwoChunks(List<string> first, List<string> second, int columnIndex)
         {
-            for (int i = 0; i < records; i++)
+            int i = 0, j = 0;
+            var resultList = new List<string>();
+
+            while (i < first.Count && j < second.Count)
             {
-                if (file.Peek() < 0) break;
-                queue.Enqueue(file.ReadLine());
+                if (first[i].Split(new string[] { "#" }, StringSplitOptions.RemoveEmptyEntries)[columnIndex].CompareTo(second[j].Split(new string[] { "#" }, StringSplitOptions.RemoveEmptyEntries)[columnIndex]) < 0)
+                {
+                    resultList.Add(first[i]);
+                    i++;
+                }
+                else if (first[i].Split(new string[] { "#" }, StringSplitOptions.RemoveEmptyEntries)[columnIndex].CompareTo(second[j].Split(new string[] { "#" }, StringSplitOptions.RemoveEmptyEntries)[columnIndex]) > 0)
+                {
+                    resultList.Add(second[j]);
+                    j++;
+                }
+                else
+                {
+                    resultList.Add(first[i]);
+                    resultList.Add(second[j]);
+                    i++;
+                    j++;
+                }
             }
+
+            while (i < first.Count)
+            {
+                resultList.Add(first[i]);
+                i++;
+            }
+
+            while (j < second.Count)
+            {
+                resultList.Add(second[j]);
+                j++;
+            }
+
+            return resultList;
         }
         #endregion
 
