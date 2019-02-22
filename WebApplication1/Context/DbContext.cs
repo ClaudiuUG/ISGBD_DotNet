@@ -122,14 +122,17 @@ namespace KeyValueDatabaseApi.Context
         public string SelectFromTable(string tableName, List<string> columnList, string keyColumn, string keyValue)
         {
             ThrowIfNoDatabaseInUse();
-            var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
+            //var resultTableRows = SelectRowFromTable(tableName, columnList, keyColumn, keyValue);
             //return string.Join(" ", resultTableRows);
 
             //return GroupByHavingCount("studenti", "varsta", 2, "<");
             //return GroupByHavingSum("note", "nota", 7, ">");
             //return SelectUnion("studenti", "note");
             //return SelectIntersect("studenti", "note");
-            return SelectOrderBy("studenti", "nume");
+            //return SelectOrderBy("studenti", "nume");
+
+            var resultTableRows = SelectRowFromTable("studenti", new List<string> {"nrmatricol", "varsta"}, null, null);
+            return string.Join(" ", resultTableRows);
         }
 
         public void CreateIndex(string indexName, string tableName, List<string> columnNames)
@@ -669,13 +672,18 @@ namespace KeyValueDatabaseApi.Context
             var rows = row.Split('|');
             foreach (string newRow in rows)
             {
-                var values = newRow.Split('#');
-                for (var i = 0; i < values.Length; i++)
+                var values = newRow.Split('#').ToList();
+                for (var i = 0; i < values.Count; i++)
                 {
                     if (string.IsNullOrEmpty(values[i].Trim()))
                     {
-                        continue;
+                        values.Remove(values[i]);
+                        i--;
                     }
+                }
+
+                for (var i = 0; i < values.Count; i++)
+                {
                     if (columnNames == null || columnNames.Contains(tableMetadata.Structure.ElementAt(i).AttributeName) || columnNames.Count == 0)
                     {
                         result.Add(values[i]);
